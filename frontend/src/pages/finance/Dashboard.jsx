@@ -1,0 +1,91 @@
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { Line, Doughnut } from 'react-chartjs-2'
+import { dashboardApi } from '../../services/api'
+import StatCard from '../../components/StatCard'
+import { CurrencyDollarIcon, ClockIcon, CalendarIcon, BanknotesIcon } from '@heroicons/react/24/outline'
+
+export default function FinanceDashboard() {
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { fetchStats() }, [])
+
+  const fetchStats = async () => {
+    try { const response = await dashboardApi.getFinanceStats(); setStats(response.data.data) } 
+    catch (error) { console.error('Failed to fetch stats:', error) } finally { setLoading(false) }
+  }
+
+  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+
+  const trendData = {
+    labels: stats?.monthly_trends?.map((t) => t.month) || [],
+    datasets: [{
+      label: 'Revenue',
+      data: stats?.monthly_trends?.map((t) => t.total) || [],
+      fill: true, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', tension: 0.4,
+    }],
+  }
+
+  const typeData = {
+    labels: stats?.revenue_by_type?.map((t) => t.name) || [],
+    datasets: [{
+      data: stats?.revenue_by_type?.map((t) => t.total) || [],
+      backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(236, 72, 153, 0.8)'],
+      borderWidth: 0,
+    }],
+  }
+
+  return (
+    <div className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Finance Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400">Financial overview and statistics</p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard title="Total Revenue" value={formatCurrency(stats?.total_revenue || 0)} icon={CurrencyDollarIcon} color="primary" />
+        <StatCard title="Pending Fees" value={formatCurrency(stats?.pending_fees || 0)} icon={ClockIcon} color="orange" delay={0.1} />
+        <StatCard title="Today's Collection" value={formatCurrency(stats?.today_payments || 0)} icon={CalendarIcon} color="blue" delay={0.2} />
+        <StatCard title="Monthly Revenue" value={formatCurrency(stats?.monthly_revenue || 0)} icon={BanknotesIcon} color="teal" delay={0.3} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Revenue Trend</h3>
+          <div className="h-64"><Line data={trendData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} /></div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Revenue by Fee Type</h3>
+          <div className="h-64 flex items-center justify-center"><Doughnut data={typeData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} /></div>
+        </motion.div>
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Payments</h3>
+        <div className="space-y-3">
+          {stats?.recent_payments?.slice(0, 5).map((payment) => (
+            <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-medium">
+                  {payment.student_fee?.student?.user?.first_name?.[0]}{payment.student_fee?.student?.user?.last_name?.[0]}
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{payment.student_fee?.student?.user?.first_name} {payment.student_fee?.student?.user?.last_name}</p>
+                  <p className="text-sm text-gray-500">{payment.student_fee?.fee_type?.name}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold text-green-600">{formatCurrency(payment.amount)}</p>
+                <p className="text-xs text-gray-500">{payment.reference_number}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
