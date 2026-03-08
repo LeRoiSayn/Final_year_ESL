@@ -21,7 +21,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\ELearningController;
 use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\RegistrarController;
 use App\Http\Controllers\Api\NotificationController;
 
 // Public routes
@@ -253,4 +253,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{teacher}/bulk-assign-courses', [TeacherController::class, 'bulkAssignCourses']);
         Route::delete('/{teacher}/remove-course/{classId}', [TeacherController::class, 'removeCourse']);
     });
+});
+
+// ==================== REGISTRAR USER MANAGEMENT ====================
+
+Route::middleware('auth:sanctum')->prefix('registrar')->group(function () {
+    Route::get('/users', [RegistrarController::class, 'listUsers']);
+    Route::post('/users', [RegistrarController::class, 'createUser']);
+    Route::delete('/users/{id}', [RegistrarController::class, 'deleteUser']);
+    Route::post('/users/{id}/reset-password', [RegistrarController::class, 'resetPassword']);
+    Route::put('/users/{id}/profile', [RegistrarController::class, 'updateUserProfile']);
 });

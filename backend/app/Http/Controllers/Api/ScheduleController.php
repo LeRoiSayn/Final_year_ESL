@@ -36,6 +36,8 @@ class ScheduleController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
             'room' => 'nullable|string|max:50',
+            'midterm_date' => 'nullable|date',
+            'final_date' => 'nullable|date',
         ]);
 
         // Check for conflicts
@@ -72,6 +74,8 @@ class ScheduleController extends Controller
             'start_time' => 'sometimes|date_format:H:i',
             'end_time' => 'sometimes|date_format:H:i|after:start_time',
             'room' => 'nullable|string|max:50',
+            'midterm_date' => 'nullable|date',
+            'final_date' => 'nullable|date',
         ]);
 
         $schedule->update($request->all());

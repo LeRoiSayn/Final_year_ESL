@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { useI18n } from '../../i18n/index.jsx'
 import { teacherApi, gradeApi } from '../../services/api'
 import { BookOpenIcon, CheckCircleIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import api from '../../services/api'
@@ -34,6 +35,7 @@ function letterGrade(score) {
 
 export default function TeacherGrades() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [classes, setClasses]         = useState([])
   const [selectedClass, setSelectedClass] = useState(null)
   const [students, setStudents]       = useState([])
@@ -46,7 +48,7 @@ export default function TeacherGrades() {
 
   const fetchClasses = async () => {
     try { const res = await teacherApi.getClasses(user.teacher.id); setClasses(res.data.data) }
-    catch { toast.error('Impossible de charger les classes') }
+    catch { toast.error(t('error')) }
     finally { setLoading(false) }
   }
 
@@ -66,7 +68,7 @@ export default function TeacherGrades() {
         }
       })
       setGrades(map)
-    } catch { toast.error('Impossible de charger les étudiants') }
+    } catch { toast.error(t('error')) }
     finally { setLoading(false) }
   }
 
@@ -89,8 +91,8 @@ export default function TeacherGrades() {
         }))
         .filter(g => Object.values(g).some((v, i) => i > 0 && v !== null))
       await gradeApi.bulkUpdate(payload)
-      toast.success('Notes enregistrées')
-    } catch { toast.error("Erreur lors de l'enregistrement") }
+      toast.success(t('grade_saved'))
+    } catch { toast.error(t('error')) }
     finally { setSaving(false) }
   }
 
@@ -114,9 +116,9 @@ export default function TeacherGrades() {
     setSubmitting(true)
     try {
       await api.post(`/grades/submit-class/${selectedClass.id}`)
-      toast.success("Notes soumises à l'administration ✓")
+      toast.success(t('grade_submitted_success'))
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur lors de la soumission')
+      toast.error(err.response?.data?.message || t('error'))
     } finally { setSubmitting(false) }
   }
 
@@ -126,9 +128,9 @@ export default function TeacherGrades() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Carnet de Notes</h1>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('gradebook')}</h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Saisir les notes (Présence /10 · Quiz /20 · Contrôle Continu /30 · Examen Final /40)
+          {t('gradebook_subtitle')}
         </p>
       </motion.div>
 
@@ -146,7 +148,7 @@ export default function TeacherGrades() {
                 </div>
               </div>
               <p className="text-sm text-gray-500">
-                {cls.enrollments?.filter(e => e.status === 'enrolled').length || 0} étudiants
+                {cls.enrollments?.filter(e => e.status === 'enrolled').length || 0} {t('students')}
               </p>
             </button>
           ))}
@@ -155,36 +157,36 @@ export default function TeacherGrades() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4">
-              <button onClick={() => setSelectedClass(null)} className="btn-secondary">← Retour</button>
+              <button onClick={() => setSelectedClass(null)} className="btn-secondary">{t('back_to_list')}</button>
               <div>
                 <h2 className="font-semibold">{selectedClass.course?.name}</h2>
-                <p className="text-sm text-gray-500">{selectedClass.course?.code} · Section {selectedClass.section}</p>
+                <p className="text-sm text-gray-500">{selectedClass.course?.code} · {t('section_label')} {selectedClass.section}</p>
               </div>
             </div>
             <div className="flex gap-2">
               <button onClick={handleSave} disabled={saving} className="btn-secondary flex items-center gap-2">
                 <CheckCircleIcon className="w-4 h-4" />
-                {saving ? 'Enregistrement...' : 'Enregistrer'}
+                {saving ? t('saving') : t('save_grades')}
               </button>
               <button
                 onClick={handleSubmitToAdmin}
                 disabled={saving || submitting}
                 className="btn-primary flex items-center gap-2"
-                title="Enregistrer les notes et notifier l'administration"
+                title={t('submit_grades')}
               >
                 <PaperAirplaneIcon className="w-4 h-4" />
-                {submitting ? 'Envoi...' : 'Soumettre à l\'admin'}
+                {submitting ? t('submitting') : t('submit_grades')}
               </button>
             </div>
           </div>
 
           {/* Weight summary chips */}
           <div className="flex flex-wrap gap-2 text-xs">
-            {[['Présence','text-purple-600 bg-purple-50','/10'],
-              ['Quiz','text-blue-600 bg-blue-50','/20'],
-              ['Contrôle Continu','text-orange-600 bg-orange-50','/30'],
-              ['Examen Final','text-green-600 bg-green-50','/40']].map(([label, cls, w]) => (
-              <span key={label} className={`px-2 py-1 rounded-full font-medium ${cls}`}>{label}: {w}</span>
+            {[['presence_short','text-purple-600 bg-purple-50','/10'],
+              ['quiz','text-blue-600 bg-blue-50','/20'],
+              ['cc_short','text-orange-600 bg-orange-50','/30'],
+              ['final_exam','text-green-600 bg-green-50','/40']].map(([key, cls, w]) => (
+              <span key={key} className={`px-2 py-1 rounded-full font-medium ${cls}`}>{t(key)}: {w}</span>
             ))}
           </div>
 
@@ -193,14 +195,14 @@ export default function TeacherGrades() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Étudiant</th>
-                    <th>Matricule</th>
-                    <th className="w-28">Présence<br/><span className="font-normal text-xs text-gray-400">/10</span></th>
-                    <th className="w-28">Quiz<br/><span className="font-normal text-xs text-gray-400">/20</span></th>
-                    <th className="w-28">CC<br/><span className="font-normal text-xs text-gray-400">/30</span></th>
-                    <th className="w-28">Examen<br/><span className="font-normal text-xs text-gray-400">/40</span></th>
-                    <th className="w-24">Total</th>
-                    <th className="w-20">Mention</th>
+                    <th>{t('student_col')}</th>
+                    <th>{t('student_id_col')}</th>
+                    <th className="w-28">{t('presence_short')}<br/><span className="font-normal text-xs text-gray-400">/10</span></th>
+                    <th className="w-28">{t('quiz')}<br/><span className="font-normal text-xs text-gray-400">/20</span></th>
+                    <th className="w-28">{t('cc_short')}<br/><span className="font-normal text-xs text-gray-400">/30</span></th>
+                    <th className="w-28">{t('exam')}<br/><span className="font-normal text-xs text-gray-400">/40</span></th>
+                    <th className="w-24">{t('total_score_col')}</th>
+                    <th className="w-20">{t('mention_col')}</th>
                   </tr>
                 </thead>
                 <tbody>

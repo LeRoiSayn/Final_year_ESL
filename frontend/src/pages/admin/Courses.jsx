@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { courseApi, departmentApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
 import {
@@ -14,6 +15,7 @@ import {
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
 
 export default function AdminCourses() {
+  const { t } = useI18n()
   const [courses, setCourses] = useState([])
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -42,7 +44,7 @@ export default function AdminCourses() {
       setCourses(courseRes.data.data.data || courseRes.data.data)
       setDepartments(deptRes.data.data)
     } catch (error) {
-      toast.error('Failed to fetch data')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -53,17 +55,17 @@ export default function AdminCourses() {
     try {
       if (editingCourse) {
         await courseApi.update(editingCourse.id, formData)
-        toast.success('Course updated successfully')
+        toast.success(t('course_updated_success'))
       } else {
         await courseApi.create(formData)
-        toast.success('Course created successfully')
+        toast.success(t('course_created_success'))
       }
       setModalOpen(false)
       setEditingCourse(null)
       resetForm()
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Operation failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -94,29 +96,29 @@ export default function AdminCourses() {
   }
 
   const handleDelete = async (course) => {
-    if (!window.confirm(`Are you sure you want to delete ${course.name}?`)) return
+    if (!window.confirm(`${t('delete_confirm_prefix')} ${course.name}?`)) return
     try {
       await courseApi.delete(course.id)
-      toast.success('Course deleted successfully')
+      toast.success(t('course_deleted_success'))
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Delete failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
   const handleToggle = async (course) => {
     try {
       await courseApi.toggle(course.id)
-      toast.success(`Course ${course.is_active ? 'deactivated' : 'activated'}`)
+      toast.success(course.is_active ? t('course_deactivated') : t('course_activated'))
       fetchData()
     } catch (error) {
-      toast.error('Toggle failed')
+      toast.error(t('error'))
     }
   }
 
   const columns = [
     {
-      header: 'Course',
+      header: t('course'),
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
@@ -130,34 +132,34 @@ export default function AdminCourses() {
       ),
     },
     {
-      header: 'Department',
+      header: t('department'),
       accessor: (row) => row.department?.name,
     },
     {
-      header: 'Level',
+      header: t('level'),
       cell: (row) => <span className="badge badge-info">{row.level}</span>,
     },
     {
-      header: 'Credits',
+      header: t('course_credits'),
       accessor: 'credits',
     },
     {
-      header: 'Hours/Week',
+      header: t('hours_per_week'),
       accessor: 'hours_per_week',
     },
     {
-      header: 'Status',
+      header: t('status'),
       cell: (row) => (
         <button
           onClick={() => handleToggle(row)}
           className={`badge ${row.is_active ? 'badge-success' : 'badge-danger'}`}
         >
-          {row.is_active ? 'Active' : 'Inactive'}
+          {row.is_active ? t('active') : t('inactive')}
         </button>
       ),
     },
     {
-      header: 'Actions',
+      header: t('actions'),
       cell: (row) => (
         <div className="flex items-center gap-2">
           <button
@@ -187,10 +189,10 @@ export default function AdminCourses() {
       >
         <div>
           <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-            Courses
+            {t('courses')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Manage academic courses
+            {t('courses_subtitle')}
           </p>
         </div>
         <button
@@ -202,7 +204,7 @@ export default function AdminCourses() {
           className="btn-primary"
         >
           <PlusIcon className="w-5 h-5 mr-2" />
-          Add Course
+          {t('add_course')}
         </button>
       </motion.div>
 
@@ -216,7 +218,7 @@ export default function AdminCourses() {
           columns={columns}
           data={courses}
           loading={loading}
-          searchPlaceholder="Search courses..."
+          searchPlaceholder={t('search_courses')}
         />
       </motion.div>
 
@@ -227,20 +229,20 @@ export default function AdminCourses() {
           setModalOpen(false)
           setEditingCourse(null)
         }}
-        title={editingCourse ? 'Edit Course' : 'Add Course'}
+        title={editingCourse ? t('edit_course') : t('add_course')}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label">Department</label>
+              <label className="label">{t('department')}</label>
               <select
                 value={formData.department_id}
                 onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                 className="input"
                 required
               >
-                <option value="">Select a department</option>
+                <option value="">{t('select_department')}</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -249,14 +251,14 @@ export default function AdminCourses() {
               </select>
             </div>
             <div>
-              <label className="label">Level</label>
+              <label className="label">{t('level')}</label>
               <select
                 value={formData.level}
                 onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                 className="input"
                 required
               >
-                <option value="">Select a level</option>
+                <option value="">{t('select_level')}</option>
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
                     {l}
@@ -265,7 +267,7 @@ export default function AdminCourses() {
               </select>
             </div>
             <div>
-              <label className="label">Course Code</label>
+              <label className="label">{t('course_code')}</label>
               <input
                 type="text"
                 value={formData.code}
@@ -276,7 +278,7 @@ export default function AdminCourses() {
               />
             </div>
             <div>
-              <label className="label">Course Name</label>
+              <label className="label">{t('course_name')}</label>
               <input
                 type="text"
                 value={formData.name}
@@ -287,7 +289,7 @@ export default function AdminCourses() {
               />
             </div>
             <div>
-              <label className="label">Credits</label>
+              <label className="label">{t('course_credits')}</label>
               <input
                 type="number"
                 value={formData.credits}
@@ -300,7 +302,7 @@ export default function AdminCourses() {
               />
             </div>
             <div>
-              <label className="label">Hours per Week</label>
+              <label className="label">{t('hours_per_week')}</label>
               <input
                 type="number"
                 value={formData.hours_per_week}
@@ -312,13 +314,12 @@ export default function AdminCourses() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="label">Description</label>
+              <label className="label">{t('description')}</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="input"
                 rows={3}
-                placeholder="Brief description of the course"
               />
             </div>
           </div>
@@ -328,10 +329,10 @@ export default function AdminCourses() {
               onClick={() => setModalOpen(false)}
               className="btn-secondary"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button type="submit" className="btn-primary">
-              {editingCourse ? 'Update' : 'Create'}
+              {editingCourse ? t('update') : t('create')}
             </button>
           </div>
         </form>

@@ -4,9 +4,11 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { studentApi } from '../../services/api'
 import { BookOpenIcon, UserIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function StudentCourses() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -14,7 +16,7 @@ export default function StudentCourses() {
 
   const fetchCourses = async () => {
     try { const response = await studentApi.getCourses(user.student.id); setCourses(response.data.data) } 
-    catch (error) { toast.error('Failed to fetch courses') } finally { setLoading(false) }
+    catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>

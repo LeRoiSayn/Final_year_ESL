@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { useI18n } from '../../i18n/index.jsx'
 import { studentApi } from '../../services/api'
 import { ChartBarIcon } from '@heroicons/react/24/outline'
 
@@ -12,6 +13,7 @@ function fmtScore(val) {
 
 export default function StudentGrades() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [enrollments, setEnrollments] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -19,7 +21,7 @@ export default function StudentGrades() {
 
   const fetchGrades = async () => {
     try { const response = await studentApi.getGrades(user.student.id); setEnrollments(response.data.data) }
-    catch { toast.error('Impossible de charger les notes') }
+    catch { toast.error(t('error')) }
     finally { setLoading(false) }
   }
 
@@ -32,23 +34,23 @@ export default function StudentGrades() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Mes Notes</h1>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('my_grades')}</h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Présence (/10) · Quiz (/20) · Contrôle Continu (/30) · Examen Final (/40)
+          {t('gradebook_subtitle')}
         </p>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-6 text-center">
-          <p className="text-sm text-gray-500 mb-2">Crédits Total</p>
+          <p className="text-sm text-gray-500 mb-2">{t('total_credits')}</p>
           <p className="text-3xl font-bold text-primary-600">{totalCredits}</p>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card p-6 text-center">
-          <p className="text-sm text-gray-500 mb-2">Moyenne Générale</p>
+          <p className="text-sm text-gray-500 mb-2">{t('average_grade')}</p>
           <p className="text-3xl font-bold text-blue-600">{avgGrade.toFixed(1)}</p>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6 text-center">
-          <p className="text-sm text-gray-500 mb-2">Cours Notés</p>
+          <p className="text-sm text-gray-500 mb-2">{t('graded_courses')}</p>
           <p className="text-3xl font-bold text-teal-600">{graded.length}/{enrollments.length}</p>
         </motion.div>
       </div>
@@ -58,17 +60,16 @@ export default function StudentGrades() {
           <table className="table">
             <thead>
               <tr>
-                <th>Cours</th>
-                <th>Code</th>
-                <th>Crédits</th>
-                <th className="text-center">Présence<br/><span className="font-normal text-xs">/10</span></th>
-                <th className="text-center">Quiz<br/><span className="font-normal text-xs">/20</span></th>
-                <th className="text-center">CC<br/><span className="font-normal text-xs">/30</span></th>
-                <th className="text-center">Examen<br/><span className="font-normal text-xs">/40</span></th>
-                <th className="text-center">Final</th>
-                <th className="text-center">Mention</th>
-                <th className="text-center">Statut</th>
-              </tr>
+                <th>{t('course')}</th>
+                <th>{t('code')}</th>
+                <th>{t('credits')}</th>
+                <th className="text-center">{t('presence_short')}<br/><span className="font-normal text-xs">/10</span></th>
+                <th className="text-center">{t('quiz')}<br/><span className="font-normal text-xs">/20</span></th>
+                <th className="text-center">{t('cc_short')}<br/><span className="font-normal text-xs">/30</span></th>
+                <th className="text-center">{t('exam')}<br/><span className="font-normal text-xs">/40</span></th>
+                <th className="text-center">{t('total_score_col')}</th>
+                <th className="text-center">{t('mention_col')}</th>
+                <th className="text-center">{t('status')}</th>                <th className="text-center">{t('validation')}</th>              </tr>
             </thead>
             <tbody>
               {enrollments.map(enrollment => {
@@ -94,11 +95,20 @@ export default function StudentGrades() {
                       </span>
                     </td>
                     <td className="text-center">
-                      <span className={`badge ${
-                        g ? (final >= 50 ? 'badge-success' : 'badge-danger') : 'badge-warning'
-                      }`}>
-                        {g ? (final >= 50 ? 'Reçu' : 'Ajourné') : 'En attente'}
+                      <span className={`badge ${g ? (final >= 50 ? 'badge-success' : 'badge-danger') : 'badge-warning'}`}>
+                        {g ? (final >= 50 ? t('passed') : t('failed')) : t('pending')}
                       </span>
+                    </td>
+                    <td className="text-center">
+                      {g ? (
+                        g.validated_at ? (
+                          <span className="badge badge-success">✓ {t('validated')}</span>
+                        ) : (
+                          <span className="badge badge-warning">{t('pending_validation')}</span>
+                        )
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                   </tr>
                 )

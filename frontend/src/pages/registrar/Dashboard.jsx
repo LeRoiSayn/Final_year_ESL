@@ -3,12 +3,14 @@ import { motion } from 'framer-motion'
 import { Bar } from 'react-chartjs-2'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
-import { UserGroupIcon, UsersIcon, CalendarIcon, PlusCircleIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
+import { UserGroupIcon, UsersIcon, CalendarIcon, PlusCircleIcon, ShieldCheckIcon, CurrencyDollarIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom'
 
 export default function RegistrarDashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const { t } = useI18n()
 
   useEffect(() => {
     fetchStats()
@@ -36,7 +38,7 @@ export default function RegistrarDashboard() {
   const levelData = {
     labels: stats?.students_by_level?.map((l) => l.level) || [],
     datasets: [{
-      label: 'Students',
+      label: t('students'),
       data: stats?.students_by_level?.map((l) => l.count) || [],
       backgroundColor: 'rgba(59, 130, 246, 0.8)',
       borderRadius: 8,
@@ -47,45 +49,57 @@ export default function RegistrarDashboard() {
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Registrar Dashboard
+          {t('registrar_dashboard')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Manage student and teacher registrations
+          {t('welcome_registrar')}
         </p>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Students" value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
-        <StatCard title="Active Students" value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
-        <StatCard title="Total Teachers" value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
-        <StatCard title="New This Month" value={stats?.stats?.new_this_month || 0} icon={CalendarIcon} color="orange" delay={0.3} />
+        <StatCard title={t('total_students')} value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
+        <StatCard title={t('active_students')} value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
+        <StatCard title={t('total_teachers')} value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
+        <StatCard title={t('new_this_month')} value={stats?.stats?.new_this_month || 0} icon={CalendarIcon} color="orange" delay={0.3} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Students by Level</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('students_by_level_registrar')}</h3>
           <div className="h-64">
             <Bar data={levelData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('quick_actions')}</h3>
+          <div className="grid grid-cols-2 gap-3">
             <Link to="/registrar/students" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group">
               <PlusCircleIcon className="w-8 h-8 mx-auto mb-2 text-primary-500 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 dark:text-white">Add Student</p>
+              <p className="font-medium text-gray-900 dark:text-white text-sm">{t('add_student')}</p>
             </Link>
             <Link to="/registrar/teachers" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group">
-              <PlusCircleIcon className="w-8 h-8 mx-auto mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 dark:text-white">Add Teacher</p>
+              <UsersIcon className="w-8 h-8 mx-auto mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-gray-900 dark:text-white text-sm">{t('add_teacher')}</p>
+            </Link>
+            <Link to="/registrar/users?role=finance" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group">
+              <CurrencyDollarIcon className="w-8 h-8 mx-auto mb-2 text-green-500 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-gray-900 dark:text-white text-sm">{t('add_finance')}</p>
+            </Link>
+            <Link to="/registrar/users?role=registrar" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group">
+              <ClipboardDocumentCheckIcon className="w-8 h-8 mx-auto mb-2 text-orange-500 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-gray-900 dark:text-white text-sm">{t('add_registrar')}</p>
+            </Link>
+            <Link to="/registrar/users?role=admin" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group col-span-2 sm:col-span-1">
+              <ShieldCheckIcon className="w-8 h-8 mx-auto mb-2 text-red-500 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-gray-900 dark:text-white text-sm">{t('add_admin')}</p>
             </Link>
           </div>
         </motion.div>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Registrations</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('recent_registrations')}</h3>
         <div className="space-y-4">
           {stats?.recent_students?.map((student) => (
             <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
@@ -104,3 +118,4 @@ export default function RegistrarDashboard() {
     </div>
   )
 }
+

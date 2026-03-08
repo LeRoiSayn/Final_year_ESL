@@ -9,10 +9,6 @@ use App\Models\Faculty;
 use App\Models\Department;
 use App\Models\Course;
 use App\Models\FeeType;
-use App\Models\Student;
-use App\Models\Teacher;
-use App\Models\ClassModel;
-use App\Models\Enrollment;
 
 class DatabaseSeeder extends Seeder
 {
@@ -32,9 +28,6 @@ class DatabaseSeeder extends Seeder
 
         // Create fee types
         $this->createFeeTypes();
-
-        // Create sample students and teachers
-        $this->createSampleStudentsAndTeachers($faculty);
     }
 
     private function createDefaultUsers(): void
@@ -403,123 +396,4 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
-    private function createSampleStudentsAndTeachers(Faculty $faculty): void
-    {
-        $biologyDept = Department::where('code', 'BIO')->first();
-        $immunologyDept = Department::where('code', 'IMM')->first();
-        
-        $faker = \Faker\Factory::create('fr_FR');
-        $academicYear = '2025-2026';
-        $semester = '1';
-
-        // ==================== CREATE TEACHERS ====================
-        $teachers = [];
-        
-        for ($i = 0; $i < 15; $i++) {
-            $dept = $i % 2 === 0 ? $biologyDept : $immunologyDept;
-            
-            $teacherUser = User::create([
-                'username' => "teacher_" . ($i + 1),
-                'email' => "teacher{$i}@unilak.ac.ke",
-                'password' => Hash::make('password'),
-                'first_name' => $faker->firstName('male'),
-                'last_name' => $faker->lastName(),
-                'role' => 'teacher',
-                'phone' => $faker->phoneNumber(),
-                'gender' => 'male',
-                'is_active' => true,
-            ]);
-
-            $teacher = Teacher::create([
-                'user_id' => $teacherUser->id,
-                'department_id' => $dept->id,
-                'employee_id' => 'EMP-' . str_pad($i + 1, 5, '0', STR_PAD_LEFT),
-                'qualification' => $faker->randomElement(['Master', 'PhD', 'Bachelor']),
-                'specialization' => $faker->word(),
-                'hire_date' => $faker->dateTimeBetween('-10 years')->format('Y-m-d'),
-                'salary' => rand(500000, 1500000),
-                'status' => 'active',
-            ]);
-            
-            $teachers[] = $teacher;
-        }
-
-        // ==================== CREATE STUDENTS ====================
-        $bioL1Courses = Course::where('department_id', $biologyDept->id)
-            ->where('level', 'L1')
-            ->limit(5)
-            ->get();
-
-        $immL1Courses = Course::where('department_id', $immunologyDept->id)
-            ->where('level', 'L1')
-            ->limit(5)
-            ->get();
-        
-        // Create 40 students
-        for ($i = 0; $i < 40; $i++) {
-            $dept = $i % 2 === 0 ? $biologyDept : $immunologyDept;
-            $courses = $i % 2 === 0 ? $bioL1Courses : $immL1Courses;
-            
-            $studentUser = User::create([
-                'username' => "student_" . ($i + 1),
-                'email' => "student{$i}@unilak.ac.ke",
-                'password' => Hash::make('password'),
-                'first_name' => $faker->firstName(),
-                'last_name' => $faker->lastName(),
-                'role' => 'student',
-                'phone' => $faker->phoneNumber(),
-                'gender' => $faker->randomElement(['male', 'female']),
-                'date_of_birth' => $faker->dateTimeBetween('-25 years', '-18 years')->format('Y-m-d'),
-                'is_active' => true,
-            ]);
-
-            $student = Student::create([
-                'user_id' => $studentUser->id,
-                'department_id' => $dept->id,
-                'student_id' => 'STU-' . str_pad($i + 1, 5, '0', STR_PAD_LEFT),
-                'level' => 'L1',
-                'enrollment_date' => now()->subDays(rand(1, 30)),
-                'guardian_name' => $faker->name(),
-                'guardian_phone' => $faker->phoneNumber(),
-                'status' => 'active',
-            ]);
-
-            // Auto-enroll in 5 courses with automatic class creation if needed
-            foreach ($courses as $course) {
-                // Find or create class for this course
-                $class = ClassModel::where('course_id', $course->id)
-                    ->where('academic_year', $academicYear)
-                    ->where('semester', $semester)
-                    ->first();
-                
-                if (!$class) {
-                    $randomTeacher = $teachers[array_rand($teachers)];
-                    $class = ClassModel::create([
-                        'course_id' => $course->id,
-                        'teacher_id' => $randomTeacher->id,
-                        'section' => chr(65 + rand(0, 2)), // A, B, C
-                        'room' => 'Room ' . rand(101, 210),
-                        'capacity' => 50,
-                        'academic_year' => $academicYear,
-                        'semester' => $semester,
-                        'is_active' => true,
-                    ]);
-                }
-
-                // Check if already enrolled
-                $alreadyEnrolled = Enrollment::where('student_id', $student->id)
-                    ->where('class_id', $class->id)
-                    ->exists();
-
-                if (!$alreadyEnrolled) {
-                    Enrollment::create([
-                        'student_id' => $student->id,
-                        'class_id' => $class->id,
-                        'enrollment_date' => now(),
-                        'status' => 'enrolled',
-                    ]);
-                }
-            }
-        }
-    }
 }

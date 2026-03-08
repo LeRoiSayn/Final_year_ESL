@@ -5,10 +5,12 @@ import { studentApi, departmentApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
 import { PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
 
 export default function RegistrarStudents() {
+  const { t } = useI18n()
   const [students, setStudents] = useState([])
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,14 +28,14 @@ export default function RegistrarStudents() {
       const [studRes, deptRes] = await Promise.all([studentApi.getAll({ per_page: 100 }), departmentApi.getAll({ active_only: true })])
       setStudents(studRes.data.data.data || studRes.data.data)
       setDepartments(deptRes.data.data)
-    } catch (error) { toast.error('Failed to fetch data') } finally { setLoading(false) }
+    } catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       await studentApi.create(formData)
-      toast.success('Student created and auto-enrolled successfully!')
+      toast.success(t('student_auto_enrolled'))
       setModalOpen(false)
       setFormData({ first_name: '', last_name: '', email: '', username: '', password: '', phone: '', date_of_birth: '', gender: '', department_id: '', level: 'L1', enrollment_date: new Date().toISOString().split('T')[0], guardian_name: '', guardian_phone: '' })
       fetchData()
@@ -42,8 +44,8 @@ export default function RegistrarStudents() {
 
   const handleDelete = async (student) => {
     if (!window.confirm(`Delete ${student.user?.first_name}?`)) return
-    try { await studentApi.delete(student.id); toast.success('Deleted'); fetchData() } 
-    catch (error) { toast.error('Delete failed') }
+    try { await studentApi.delete(student.id); toast.success(t('item_deleted')); fetchData() } 
+    catch (error) { toast.error(t('error')) }
   }
 
   const columns = [

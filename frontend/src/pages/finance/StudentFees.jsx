@@ -5,8 +5,10 @@ import { studentFeeApi, studentApi, feeTypeApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
 import { PlusIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function FinanceStudentFees() {
+  const { t } = useI18n()
   const [fees, setFees] = useState([])
   const [students, setStudents] = useState([])
   const [feeTypes, setFeeTypes] = useState([])
@@ -22,12 +24,12 @@ export default function FinanceStudentFees() {
       setFees(feeRes.data.data.data || feeRes.data.data)
       setStudents(studRes.data.data.data || studRes.data.data)
       setFeeTypes(typeRes.data.data)
-    } catch (error) { toast.error('Failed to fetch data') } finally { setLoading(false) }
+    } catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    try { await studentFeeApi.create(formData); toast.success('Fee assigned'); setModalOpen(false); setFormData({ student_id: '', fee_type_id: '', amount: '', due_date: '', academic_year: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}` }); fetchData() } 
+    try { await studentFeeApi.create(formData); toast.success(t('fee_assigned')); setModalOpen(false); setFormData({ student_id: '', fee_type_id: '', amount: '', due_date: '', academic_year: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}` }); fetchData() } 
     catch (error) { toast.error(error.response?.data?.message || 'Failed') }
   }
 

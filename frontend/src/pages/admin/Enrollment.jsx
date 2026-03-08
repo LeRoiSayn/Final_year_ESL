@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { studentApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import DataTable from '../../components/DataTable'
 import {
   CheckCircleIcon,
@@ -10,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function AdminEnrollment() {
+  const { t } = useI18n()
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [enrollingAll, setEnrollingAll] = useState(false)
@@ -23,7 +25,7 @@ export default function AdminEnrollment() {
       const response = await studentApi.getAll({ per_page: 100 })
       setStudents(response.data.data.data || response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch students')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -35,12 +37,12 @@ export default function AdminEnrollment() {
       toast.success(response.data.message)
       fetchStudents()
     } catch (error) {
-      toast.error('Auto-enrollment failed')
+      toast.error(t('error'))
     }
   }
 
   const handleAutoEnrollAll = async () => {
-    if (!window.confirm('This will auto-enroll all active students in their respective courses. Continue?')) return
+    if (!window.confirm(t('enroll_all_confirm'))) return
     
     setEnrollingAll(true)
     try {
@@ -48,7 +50,7 @@ export default function AdminEnrollment() {
       toast.success(response.data.message)
       fetchStudents()
     } catch (error) {
-      toast.error('Mass auto-enrollment failed')
+      toast.error(t('error'))
     } finally {
       setEnrollingAll(false)
     }
@@ -56,7 +58,7 @@ export default function AdminEnrollment() {
 
   const columns = [
     {
-      header: 'Student',
+      header: t('student'),
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-medium">
@@ -70,23 +72,23 @@ export default function AdminEnrollment() {
       ),
     },
     {
-      header: 'Department',
+      header: t('department'),
       accessor: (row) => row.department?.name,
     },
     {
-      header: 'Level',
+      header: t('level'),
       cell: (row) => <span className="badge badge-info">{row.level}</span>,
     },
     {
-      header: 'Status',
+      header: t('status'),
       cell: (row) => (
         <span className={`badge ${row.status === 'active' ? 'badge-success' : 'badge-warning'}`}>
-          {row.status}
+          {t(row.status)}
         </span>
       ),
     },
     {
-      header: 'Actions',
+      header: t('actions'),
       cell: (row) => (
         <button
           onClick={() => handleAutoEnroll(row)}
@@ -94,7 +96,7 @@ export default function AdminEnrollment() {
           className="btn-primary py-1.5 px-3 text-sm disabled:opacity-50"
         >
           <PlayIcon className="w-4 h-4 mr-1" />
-          Auto Enroll
+          {t('auto_enroll_action')}
         </button>
       ),
     },
@@ -109,10 +111,10 @@ export default function AdminEnrollment() {
       >
         <div>
           <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-            Auto Enrollment
+            {t('auto_enrollment_title')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Automatically enroll students in their level courses
+            {t('auto_enrollment_subtitle')}
           </p>
         </div>
         <button
@@ -123,12 +125,12 @@ export default function AdminEnrollment() {
           {enrollingAll ? (
             <>
               <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
-              Enrolling...
+              {t('enrolling')}
             </>
           ) : (
             <>
               <CheckCircleIcon className="w-5 h-5 mr-2" />
-              Enroll All Students
+              {t('enroll_all')}
             </>
           )}
         </button>
@@ -168,7 +170,7 @@ export default function AdminEnrollment() {
           columns={columns}
           data={students}
           loading={loading}
-          searchPlaceholder="Search students..."
+          searchPlaceholder={t('search_students')}
         />
       </motion.div>
     </div>

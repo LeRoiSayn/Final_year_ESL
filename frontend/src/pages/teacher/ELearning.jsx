@@ -25,8 +25,10 @@ import {
   CloudArrowUpIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
+import { useI18n } from "../../i18n/index.jsx";
 
 const ELearning = () => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("courses");
   const [myCourses, setMyCourses] = useState([]);
   const [onlineCourses, setOnlineCourses] = useState([]);
@@ -124,9 +126,9 @@ const ELearning = () => {
       if (res.data.meeting_url) {
         window.open(res.data.meeting_url, "_blank", "noopener,noreferrer");
       }
-      toast.success("Session démarrée !");
+      toast.success(t('session_started'));
     } catch (err) {
-      toast.error("Impossible de démarrer la session.");
+      toast.error(t('error'));
     }
   };
 
@@ -138,9 +140,9 @@ const ELearning = () => {
         prev.map((c) => (c.id === id ? updated : c))
       );
       setEditingCourse(null);
-      toast.success("Cours mis à jour.");
+      toast.success(t('item_updated'));
     } catch (err) {
-      toast.error("Erreur lors de la mise à jour.");
+      toast.error(t('error'));
     }
   };
 
@@ -148,20 +150,20 @@ const ELearning = () => {
     if (!confirm("Supprimer ce document?")) return;
     try {
       await api.delete(`/elearning/materials/${id}`);
-      toast.success("Document supprimé");
+      toast.success(t('item_deleted'));
       fetchMaterials(selectedCourse?.course_id || selectedCourse?.id);
     } catch (error) {
-      toast.error("Erreur lors de la suppression");
+      toast.error(t('error'));
     }
   };
 
   const publishQuiz = async (id) => {
     try {
       await api.post(`/elearning/quizzes/${id}/publish`);
-      toast.success("Quiz publié");
+      toast.success(t('quiz_published'));
       fetchQuizzes(selectedCourse?.course_id || selectedCourse?.id);
     } catch (error) {
-      toast.error("Erreur lors de la publication");
+      toast.error(t('error'));
     }
   };
 
@@ -169,20 +171,20 @@ const ELearning = () => {
     if (!confirm("Supprimer ce quiz et toutes les tentatives?")) return;
     try {
       await api.delete(`/elearning/quizzes/${id}`);
-      toast.success("Quiz supprimé");
+      toast.success(t('quiz_deleted'));
       fetchQuizzes(selectedCourse?.course_id || selectedCourse?.id);
     } catch (error) {
-      toast.error("Erreur lors de la suppression");
+      toast.error(t('error'));
     }
   };
 
   const publishAssignment = async (id) => {
     try {
       await api.post(`/elearning/assignments/${id}/publish`);
-      toast.success("Devoir publié");
+      toast.success(t('assignment_published'));
       fetchAssignments(selectedCourse?.course_id || selectedCourse?.id);
     } catch (error) {
-      toast.error("Erreur lors de la publication");
+      toast.error(t('error'));
     }
   };
 
@@ -190,10 +192,10 @@ const ELearning = () => {
     if (!confirm("Supprimer ce devoir et toutes les soumissions?")) return;
     try {
       await api.delete(`/elearning/assignments/${id}`);
-      toast.success("Devoir supprimé");
+      toast.success(t('assignment_deleted'));
       fetchAssignments(selectedCourse?.course_id || selectedCourse?.id);
     } catch (error) {
-      toast.error("Erreur lors de la suppression");
+      toast.error(t('error'));
     }
   };
 
@@ -266,12 +268,12 @@ const ELearning = () => {
       setIsSubmitting(true);
       try {
         await api.post("/elearning/courses", formData);
-        toast.success("Cours en ligne créé avec succès");
+        toast.success(t('course_online_created'));
         setShowModal(null);
         fetchData();
       } catch (error) {
         toast.error(
-          error.response?.data?.message || "Erreur lors de la création",
+          error.response?.data?.message || t('error'),
         );
       } finally {
         setIsSubmitting(false);
@@ -500,7 +502,7 @@ const ELearning = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (formData.mode === "file" && !file) {
-        toast.error("Veuillez sélectionner un fichier");
+        toast.error(t('select_file_first'));
         return;
       }
 
@@ -525,12 +527,12 @@ const ELearning = () => {
         await api.post("/elearning/materials", data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success("Document uploadé avec succès");
+        toast.success(t('upload_success'));
         setShowModal(null);
         if (selectedCourse)
           fetchMaterials(selectedCourse.course_id || selectedCourse.id);
       } catch (error) {
-        toast.error(error.response?.data?.message || "Erreur lors de l'upload");
+        toast.error(error.response?.data?.message || t('error'));
       } finally {
         setIsSubmitting(false);
       }
@@ -736,19 +738,19 @@ const ELearning = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (formData.questions.some((q) => !q.question || !q.correct_answer)) {
-        toast.error("Veuillez compléter toutes les questions");
+        toast.error(t('complete_all_questions'));
         return;
       }
       setIsSubmitting(true);
       try {
         await api.post("/elearning/quizzes", formData);
-        toast.success("Quiz créé avec succès");
+        toast.success(t('quiz_created'));
         setShowModal(null);
         if (selectedCourse)
           fetchQuizzes(selectedCourse.course_id || selectedCourse.id);
       } catch (error) {
         toast.error(
-          error.response?.data?.message || "Erreur lors de la création",
+          error.response?.data?.message || t('error'),
         );
       } finally {
         setIsSubmitting(false);
@@ -1092,13 +1094,13 @@ const ELearning = () => {
       setIsSubmitting(true);
       try {
         await api.post("/elearning/assignments", formData);
-        toast.success("Devoir créé avec succès");
+        toast.success(t('assignment_created'));
         setShowModal(null);
         if (selectedCourse)
           fetchAssignments(selectedCourse.course_id || selectedCourse.id);
       } catch (error) {
         toast.error(
-          error.response?.data?.message || "Erreur lors de la création",
+          error.response?.data?.message || t('error'),
         );
       } finally {
         setIsSubmitting(false);
@@ -1285,7 +1287,7 @@ const ELearning = () => {
           );
           setData(response.data);
         } catch (error) {
-          toast.error("Erreur lors du chargement des résultats");
+          toast.error(t('error'));
         } finally {
           setLoading(false);
         }
@@ -1414,7 +1416,7 @@ const ELearning = () => {
         );
         setData(response.data);
       } catch (error) {
-        toast.error("Erreur lors du chargement");
+        toast.error(t('error'));
       } finally {
         setLoading(false);
       }
@@ -1427,12 +1429,12 @@ const ELearning = () => {
           `/elearning/assignments/submission/${grading.id}/grade`,
           gradeForm,
         );
-        toast.success("Note enregistrée");
+        toast.success(t('grade_recorded'));
         setGrading(null);
         setGradeForm({ grade: "", feedback: "" });
         fetchSubmissions();
       } catch (error) {
-        toast.error("Erreur");
+        toast.error(t('error'));
       }
     };
 
@@ -1450,7 +1452,7 @@ const ELearning = () => {
         link.click();
         link.remove();
       } catch (error) {
-        toast.error("Erreur de téléchargement");
+        toast.error(t('error'));
       }
     };
 

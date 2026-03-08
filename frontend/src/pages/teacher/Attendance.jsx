@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { useI18n } from '../../i18n/index.jsx'
 import { teacherApi, attendanceApi } from '../../services/api'
 import { BookOpenIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 
 export default function TeacherAttendance() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [classes, setClasses] = useState([])
   const [selectedClass, setSelectedClass] = useState(null)
   const [students, setStudents] = useState([])
@@ -19,7 +21,7 @@ export default function TeacherAttendance() {
 
   const fetchClasses = async () => {
     try { const response = await teacherApi.getClasses(user.teacher.id); setClasses(response.data.data) } 
-    catch (error) { toast.error('Failed to fetch classes') } finally { setLoading(false) }
+    catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const fetchAttendance = async (classId, selectedDate) => {
@@ -30,7 +32,7 @@ export default function TeacherAttendance() {
       const attMap = {}
       response.data.data.forEach(item => { attMap[item.enrollment_id] = item.attendance?.status || 'present' })
       setAttendance(attMap)
-    } catch (error) { toast.error('Failed to fetch attendance') } finally { setLoading(false) }
+    } catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const handleClassSelect = (cls) => { setSelectedClass(cls); fetchAttendance(cls.id, date) }
@@ -42,8 +44,15 @@ export default function TeacherAttendance() {
     try {
       const attendanceData = Object.entries(attendance).map(([enrollmentId, status]) => ({ enrollment_id: parseInt(enrollmentId), status }))
       await attendanceApi.bulkMark(selectedClass.id, date, attendanceData)
-      toast.success('Attendance saved successfully')
-    } catch (error) { toast.error('Failed to save attendance') } finally { setSaving(false) }
+      toast.success(t('attendance_saved'))
+    } catch (error) { toast.error(t('error')) } finally { setSaving(false) }
+  }
+
+  const statusLabels = {
+    present: t('attendance_present'),
+    absent: t('attendance_absent'),
+    late: t('attendance_late'),
+    excused: t('attendance_excused'),
   }
 
   const getStatusColor = (status) => { const colors = { present: 'bg-green-500', absent: 'bg-red-500', late: 'bg-yellow-500', excused: 'bg-blue-500' }; return colors[status] || 'bg-gray-500' }
@@ -53,8 +62,8 @@ export default function TeacherAttendance() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Attendance</h1>
-        <p className="text-gray-500 dark:text-gray-400">Mark student attendance</p>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('attendance')}</h1>
+        <p className="text-gray-500 dark:text-gray-400">{t('attendance_subtitle')}</p>
       </motion.div>
 
       {!selectedClass ? (
@@ -72,12 +81,12 @@ export default function TeacherAttendance() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <button onClick={() => setSelectedClass(null)} className="btn-secondary">← Back</button>
+              <button onClick={() => setSelectedClass(null)} className="btn-secondary">{t('back')}</button>
               <div><h2 className="font-semibold">{selectedClass.course?.name}</h2><p className="text-sm text-gray-500">{selectedClass.course?.code}</p></div>
             </div>
             <div className="flex items-center gap-4">
               <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)} className="input w-auto" />
-              <button onClick={handleSave} disabled={saving} className="btn-primary"><CheckCircleIcon className="w-5 h-5 mr-2" />{saving ? 'Saving...' : 'Save'}</button>
+              <button onClick={handleSave} disabled={saving} className="btn-primary"><CheckCircleIcon className="w-5 h-5 mr-2" />{saving ? t('saving') : t('save')}</button>
             </div>
           </div>
 
@@ -92,13 +101,13 @@ export default function TeacherAttendance() {
                   <div className="flex items-center gap-2">
                     {['present', 'absent', 'late', 'excused'].map((status) => (
                       <button key={status} onClick={() => handleAttendanceChange(item.enrollment_id, status)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${attendance[item.enrollment_id] === status ? `${getStatusColor(status)} text-white` : 'bg-gray-200 dark:bg-dark-100 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-dark-200'}`}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {statusLabels[status]}
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
-              {students.length === 0 && <p className="text-center text-gray-500 py-8">No students in this class</p>}
+              {students.length === 0 && <p className="text-center text-gray-500 py-8">{t('no_students_class')}</p>}
             </div>
           </div>
         </motion.div>
@@ -106,3 +115,4 @@ export default function TeacherAttendance() {
     </div>
   )
 }
+

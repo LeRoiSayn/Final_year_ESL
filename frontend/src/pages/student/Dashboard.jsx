@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
+import { useI18n } from '../../i18n/index.jsx'
 import { BookOpenIcon, ChartBarIcon, ClockIcon, CurrencyDollarIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom'
 
 export default function StudentDashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const { t } = useI18n()
 
   useEffect(() => { fetchStats() }, [])
 
@@ -47,18 +49,18 @@ export default function StudentDashboard() {
         </div>
         <div className="flex-1">
           <h3 className={`font-semibold text-lg ${isPaid ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-            {isPaid ? 'Compte en règle' : 'Paiement en attente'}
+            {isPaid ? t('account_ok') : t('payment_pending')}
           </h3>
           <p className={`text-sm ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {isPaid
-              ? 'Tous vos frais de scolarité sont à jour.'
-              : `Solde restant : ${formatCurrency(pendingFees)} — Veuillez régulariser votre situation.`
+              ? t('fees_up_to_date')
+              : t('remaining_balance_notice').replace('{amount}', formatCurrency(pendingFees))
             }
           </p>
           {!isPaid && totalFees > 0 && (
             <div className="mt-2">
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-red-500 dark:text-red-400">{paymentPercent}% payé</span>
+                <span className="text-red-500 dark:text-red-400">{paymentPercent}% {t('paid_percent')}</span>
                 <span className="text-red-500 dark:text-red-400">{formatCurrency(paidAmount)} / {formatCurrency(totalFees)}</span>
               </div>
               <div className="h-2 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
@@ -75,26 +77,26 @@ export default function StudentDashboard() {
             to="/student/payment"
             className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
           >
-            Payer maintenant
+            {t('pay_now')}
           </Link>
         )}
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Tableau de bord</h1>
-        <p className="text-gray-500 dark:text-gray-400">Bienvenue ! Voici un aperçu de votre parcours académique.</p>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('student_dashboard')}</h1>
+        <p className="text-gray-500 dark:text-gray-400">{t('welcome_student')}</p>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Enrolled Courses" value={stats?.enrolled_courses || 0} icon={BookOpenIcon} color="primary" />
-        <StatCard title="Total Credits" value={stats?.total_credits || 0} icon={ChartBarIcon} color="blue" delay={0.1} />
-        <StatCard title="Attendance Rate" value={`${stats?.attendance_rate || 0}%`} icon={ClockIcon} color="teal" delay={0.2} />
-        <StatCard title="Pending Fees" value={formatCurrency(stats?.pending_fees || 0)} icon={CurrencyDollarIcon} color="orange" delay={0.3} />
+        <StatCard title={t('enrolled_courses')} value={stats?.enrolled_courses || 0} icon={BookOpenIcon} color="primary" />
+        <StatCard title={t('total_credits')} value={stats?.total_credits || 0} icon={ChartBarIcon} color="blue" delay={0.1} />
+        <StatCard title={t('attendance_rate')} value={`${stats?.attendance_rate || 0}%`} icon={ClockIcon} color="teal" delay={0.2} />
+        <StatCard title={t('pending_fees')} value={formatCurrency(stats?.pending_fees || 0)} icon={CurrencyDollarIcon} color="orange" delay={0.3} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mes Cours ce Semestre</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('my_courses_semester')}</h3>
           <div className="space-y-3">
             {stats?.courses?.slice(0, 5).map((enrollment) => (
               <div key={enrollment.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
@@ -116,40 +118,41 @@ export default function StudentDashboard() {
                 <span className="badge badge-info">{enrollment.class?.course?.credits} cr</span>
               </div>
             ))}
-            {(!stats?.courses || stats.courses.length === 0) && <p className="text-gray-500 text-center py-4">Aucun cours inscrit</p>}
+            {(!stats?.courses || stats.courses.length === 0) && <p className="text-gray-500 text-center py-4">{t('no_courses_enrolled')}</p>}
           </div>
-          <Link to="/student/courses" className="block mt-4 text-center text-primary-600 hover:text-primary-700 font-medium">Voir tous les cours →</Link>
+          <Link to="/student/courses" className="block mt-4 text-center text-primary-600 hover:text-primary-700 font-medium">{t('view_all_courses_link')}</Link>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Financial Summary</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('financial_summary')}</h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50 dark:bg-dark-300">
-              <span className="text-gray-600 dark:text-gray-400">Total Fees</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('total_fees_label')}</span>
               <span className="font-semibold">{formatCurrency(stats?.fees_summary?.total || 0)}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-green-50 dark:bg-green-900/20">
-              <span className="text-green-600 dark:text-green-400">Total Paid</span>
+              <span className="text-green-600 dark:text-green-400">{t('total_paid_label')}</span>
               <span className="font-semibold text-green-600">{formatCurrency(stats?.fees_summary?.paid || 0)}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-red-50 dark:bg-red-900/20">
-              <span className="text-red-600 dark:text-red-400">Balance Due</span>
+              <span className="text-red-600 dark:text-red-400">{t('balance_due')}</span>
               <span className="font-semibold text-red-600">{formatCurrency(stats?.fees_summary?.pending || 0)}</span>
             </div>
           </div>
-          <Link to="/student/fees" className="block mt-4 text-center text-primary-600 hover:text-primary-700 font-medium">View fees & payments →</Link>
+          <Link to="/student/fees" className="block mt-4 text-center text-primary-600 hover:text-primary-700 font-medium">{t('view_fees_link')}</Link>
         </motion.div>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Links</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('quick_links')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Link to="/student/courses" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><BookOpenIcon className="w-8 h-8 mx-auto mb-2 text-primary-500" /><p className="font-medium text-sm">My Courses</p></Link>
-          <Link to="/student/grades" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><ChartBarIcon className="w-8 h-8 mx-auto mb-2 text-green-500" /><p className="font-medium text-sm">My Grades</p></Link>
-          <Link to="/student/schedule" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><ClockIcon className="w-8 h-8 mx-auto mb-2 text-blue-500" /><p className="font-medium text-sm">Schedule</p></Link>
-          <Link to="/student/fees" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><CurrencyDollarIcon className="w-8 h-8 mx-auto mb-2 text-orange-500" /><p className="font-medium text-sm">Fees</p></Link>
+          <Link to="/student/courses" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><BookOpenIcon className="w-8 h-8 mx-auto mb-2 text-primary-500" /><p className="font-medium text-sm">{t('my_courses_link')}</p></Link>
+          <Link to="/student/grades" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><ChartBarIcon className="w-8 h-8 mx-auto mb-2 text-green-500" /><p className="font-medium text-sm">{t('my_grades_link')}</p></Link>
+          <Link to="/student/schedule" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><ClockIcon className="w-8 h-8 mx-auto mb-2 text-blue-500" /><p className="font-medium text-sm">{t('schedule_link')}</p></Link>
+          <Link to="/student/fees" className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center"><CurrencyDollarIcon className="w-8 h-8 mx-auto mb-2 text-orange-500" /><p className="font-medium text-sm">{t('fees_link')}</p></Link>
         </div>
       </motion.div>
     </div>
   )
 }
+

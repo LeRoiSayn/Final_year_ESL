@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import api, { adminApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import {
   AcademicCapIcon,
   CheckCircleIcon,
@@ -43,6 +44,7 @@ const statusConfig = {
 // Main component
 // ──────────────────────────────────────────────────────────
 export default function AdminGrades() {
+  const { t } = useI18n()
   const [classes, setClasses]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
@@ -67,7 +69,7 @@ export default function AdminGrades() {
       const payload = res.data?.data ?? res.data
       setClasses(Array.isArray(payload) ? payload : [])
     } catch {
-      toast.error('Impossible de charger les classes')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -86,7 +88,7 @@ export default function AdminGrades() {
       const rows = res.data?.data ?? res.data ?? []
       setGradeRows(Array.isArray(rows) ? rows : [])
     } catch {
-      toast.error('Impossible de charger les notes')
+      toast.error(t('error'))
     } finally {
       setGradeLoading(false)
     }
@@ -101,9 +103,9 @@ export default function AdminGrades() {
         prev.map((g) => (g.id === gradeId ? { ...g, ...editValues } : g))
       )
       setEditingId(null)
-      toast.success('Note mise à jour')
+      toast.success(t('grade_updated'))
     } catch {
-      toast.error('Erreur lors de la mise à jour')
+      toast.error(t('error'))
     } finally {
       setSaving(false)
     }
@@ -114,7 +116,7 @@ export default function AdminGrades() {
     setValidating(true)
     try {
       await adminApi.validateClassGrades(classId)
-      toast.success('Notes validées avec succès')
+      toast.success(t('grade_validated_success'))
       // Update local state
       setClasses(prev => prev.map(c =>
         c.id === classId ? { ...c, status: 'validated', rejection_reason: null } : c
@@ -123,7 +125,7 @@ export default function AdminGrades() {
         setSelectedClass(prev => ({ ...prev, status: 'validated', rejection_reason: null }))
       }
     } catch {
-      toast.error('Erreur lors de la validation')
+      toast.error(t('error'))
     } finally {
       setValidating(false)
     }
@@ -138,13 +140,13 @@ export default function AdminGrades() {
 
   const handleReject = async () => {
     if (rejectReason.trim().length < 5) {
-      toast.error('Le motif doit contenir au moins 5 caractères')
+      toast.error(t('error'))
       return
     }
     setRejecting(true)
     try {
       await adminApi.rejectClassGrades(rejectClassId, rejectReason)
-      toast.success('Notes refusées — le professeur a été notifié')
+      toast.success(t('grade_rejected_success'))
       setShowRejectModal(false)
       // Update local state
       setClasses(prev => prev.map(c =>
@@ -154,7 +156,7 @@ export default function AdminGrades() {
         setSelectedClass(prev => ({ ...prev, status: 'rejected', rejection_reason: rejectReason }))
       }
     } catch {
-      toast.error('Erreur lors du refus')
+      toast.error(t('error'))
     } finally {
       setRejecting(false)
     }
@@ -183,14 +185,14 @@ export default function AdminGrades() {
             <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">Refuser les notes</h2>
-            <p className="text-sm text-gray-500">Le professeur sera notifié du motif</p>
+            <h2 className="font-semibold text-gray-900 dark:text-white">{t('reject_grades_modal_title')}</h2>
+            <p className="text-sm text-gray-500">{t('teacher_notified_msg')}</p>
           </div>
         </div>
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Motif du refus
+              {t('rejection_reason_label')}
             </label>
             <textarea
               value={rejectReason}
@@ -199,14 +201,14 @@ export default function AdminGrades() {
               placeholder="Ex: Un élève absent n'a pas pu passer l'examen mais a reçu une note. Veuillez vérifier et corriger."
               className="w-full p-3 rounded-lg border border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300 text-gray-900 dark:text-white text-sm resize-none"
             />
-            <p className="text-xs text-gray-400 mt-1">{rejectReason.length}/500 caractères (min. 5)</p>
+            <p className="text-xs text-gray-400 mt-1">{rejectReason.length}/500 {t('reject_reason_min')}</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => setShowRejectModal(false)}
               className="flex-1 py-2.5 border border-gray-200 dark:border-dark-100 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-dark-300"
             >
-              Annuler
+              {t('cancel')}
             </button>
             <button
               onClick={handleReject}
@@ -218,7 +220,7 @@ export default function AdminGrades() {
               ) : (
                 <>
                   <XCircleIcon className="w-4 h-4" />
-                  Refuser
+                  {t('reject')}
                 </>
               )}
             </button>
@@ -275,14 +277,14 @@ export default function AdminGrades() {
                   ) : (
                     <ShieldCheckIcon className="w-4 h-4" />
                   )}
-                  Valider
+                  {t('validate')}
                 </button>
                 <button
                   onClick={() => openRejectModal(cls.id)}
                   className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
                 >
                   <XCircleIcon className="w-4 h-4" />
-                  Refuser
+                  {t('reject')}
                 </button>
               </>
             )}
@@ -294,7 +296,7 @@ export default function AdminGrades() {
           <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Motif du refus</p>
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('rejection_reason_title')}</p>
               <p className="text-sm text-red-600 dark:text-red-300 mt-1">{cls.rejection_reason}</p>
             </div>
           </div>
@@ -303,25 +305,25 @@ export default function AdminGrades() {
         {/* Grade table */}
         <div className="card overflow-hidden">
           {gradeLoading ? (
-            <div className="p-8 text-center text-gray-400">Chargement…</div>
+            <div className="p-8 text-center text-gray-400">{t('loading')}</div>
           ) : gradeRows.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
-              Aucune note enregistrée pour cette classe.
+              {t('no_grades_recorded')}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Étudiant</th>
-                    <th>Matricule</th>
+                    <th>{t('student_col')}</th>
+                    <th>{t('student_id_col')}</th>
                     <th className="text-center">Présence<br /><span className="font-normal text-xs text-gray-400">/10</span></th>
                     <th className="text-center">Quiz<br /><span className="font-normal text-xs text-gray-400">/20</span></th>
                     <th className="text-center">CC<br /><span className="font-normal text-xs text-gray-400">/30</span></th>
                     <th className="text-center">Examen<br /><span className="font-normal text-xs text-gray-400">/40</span></th>
-                    <th className="text-center">Total /100</th>
-                    <th className="text-center">Mention</th>
-                    <th className="text-center">Actions</th>
+                    <th className="text-center">{t('total_col')}</th>
+                    <th className="text-center">{t('mention_col')}</th>
+                    <th className="text-center">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -389,13 +391,13 @@ export default function AdminGrades() {
                                 disabled={saving}
                                 className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
                               >
-                                {saving ? '…' : 'Sauver'}
+                                {saving ? '…' : t('save')}
                               </button>
                               <button
                                 onClick={() => setEditingId(null)}
                                 className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                               >
-                                Annuler
+                                {t('cancel')}
                               </button>
                             </div>
                           ) : (
@@ -440,10 +442,10 @@ export default function AdminGrades() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Gestion des Notes
+          {t('grade_management')}
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Consultez et validez les notes soumises par les enseignants
+          {t('grade_management_subtitle')}
         </p>
       </div>
 
@@ -454,16 +456,16 @@ export default function AdminGrades() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher une classe…"
+          placeholder={t('search_classes')}
           className="input pl-9"
         />
       </div>
 
       {/* Class grid */}
       {loading ? (
-        <div className="text-center py-16 text-gray-400">Chargement…</div>
+        <div className="text-center py-16 text-gray-400">{t('loading')}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">Aucune classe trouvée.</div>
+        <div className="text-center py-16 text-gray-400">{t('no_classes_found')}</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((cls) => {
@@ -525,14 +527,14 @@ export default function AdminGrades() {
                       className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-green-500 text-white rounded-lg text-xs font-medium hover:bg-green-600 disabled:opacity-50 transition-colors"
                     >
                       <ShieldCheckIcon className="w-3.5 h-3.5" />
-                      Valider
+                      {t('validate')}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); openRejectModal(cls.id) }}
                       className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
                     >
                       <XCircleIcon className="w-3.5 h-3.5" />
-                      Refuser
+                      {t('reject')}
                     </button>
                   </div>
                 )}

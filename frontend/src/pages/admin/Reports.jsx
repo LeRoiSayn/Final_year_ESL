@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Bar, Pie } from 'react-chartjs-2'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
+import { useI18n } from '../../i18n/index.jsx'
 import {
   UserGroupIcon,
   UsersIcon,
@@ -11,7 +12,27 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline'
 
+// Generate dynamic colors for any number of items
+function generateColors(count) {
+  const palette = [
+    'rgba(34, 197, 94, 0.8)',
+    'rgba(59, 130, 246, 0.8)',
+    'rgba(245, 158, 11, 0.8)',
+    'rgba(236, 72, 153, 0.8)',
+    'rgba(139, 92, 246, 0.8)',
+    'rgba(20, 184, 166, 0.8)',
+    'rgba(239, 68, 68, 0.8)',
+    'rgba(249, 115, 22, 0.8)',
+    'rgba(234, 179, 8, 0.8)',
+    'rgba(16, 185, 129, 0.8)',
+    'rgba(99, 102, 241, 0.8)',
+    'rgba(236, 72, 153, 0.8)',
+  ]
+  return Array.from({ length: count }, (_, i) => palette[i % palette.length])
+}
+
 export default function AdminReports() {
+  const { t } = useI18n()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -43,14 +64,7 @@ export default function AdminReports() {
     datasets: [{
       label: 'Students',
       data: stats?.students_by_level?.map((l) => l.count) || [],
-      backgroundColor: [
-        'rgba(34, 197, 94, 0.8)',
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(245, 158, 11, 0.8)',
-        'rgba(236, 72, 153, 0.8)',
-        'rgba(139, 92, 246, 0.8)',
-        'rgba(20, 184, 166, 0.8)',
-      ],
+      backgroundColor: generateColors(stats?.students_by_level?.length || 0),
     }],
   }
 
@@ -58,12 +72,7 @@ export default function AdminReports() {
     labels: stats?.students_by_department?.map((d) => d.name) || [],
     datasets: [{
       data: stats?.students_by_department?.map((d) => d.count) || [],
-      backgroundColor: [
-        'rgba(34, 197, 94, 0.8)',
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(245, 158, 11, 0.8)',
-        'rgba(236, 72, 153, 0.8)',
-      ],
+      backgroundColor: generateColors(stats?.students_by_department?.length || 0),
       borderWidth: 0,
     }],
   }
@@ -75,10 +84,10 @@ export default function AdminReports() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Reports
+          {t('reports')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          University statistics and analytics
+          {t('reports_subtitle')}
         </p>
       </motion.div>
 
@@ -122,7 +131,7 @@ export default function AdminReports() {
           className="card p-6"
         >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Students by Level
+            {t('students_by_level')}
           </h3>
           <div className="h-64">
             <Bar
@@ -147,7 +156,7 @@ export default function AdminReports() {
           className="card p-6"
         >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Students by Department
+            {t('students_by_department')}
           </h3>
           <div className="h-64 flex items-center justify-center">
             <Pie

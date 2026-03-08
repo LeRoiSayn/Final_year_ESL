@@ -26,6 +26,7 @@ import AdminSchedules from './pages/admin/Schedules'
 import RegistrarDashboard from './pages/registrar/Dashboard'
 import RegistrarStudents from './pages/registrar/Students'
 import RegistrarTeachers from './pages/registrar/Teachers'
+import RegistrarUsers from './pages/registrar/Users'
 
 import FinanceDashboard from './pages/finance/Dashboard'
 import FinanceFeeTypes from './pages/finance/FeeTypes'
@@ -150,6 +151,7 @@ function App() {
           <Route index element={<RegistrarDashboard />} />
           <Route path="students" element={<RegistrarStudents />} />
           <Route path="teachers" element={<RegistrarTeachers />} />
+          <Route path="users" element={<RegistrarUsers />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
         </Route>

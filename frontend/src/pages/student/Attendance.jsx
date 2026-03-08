@@ -4,9 +4,11 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { studentApi } from '../../services/api'
 import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function StudentAttendance() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [enrollments, setEnrollments] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -14,7 +16,7 @@ export default function StudentAttendance() {
 
   const fetchAttendance = async () => {
     try { const response = await studentApi.getAttendance(user.student.id); setEnrollments(response.data.data) } 
-    catch (error) { toast.error('Failed to fetch attendance') } finally { setLoading(false) }
+    catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const getStatusBadge = (status) => {

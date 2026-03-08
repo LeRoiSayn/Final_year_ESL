@@ -16,6 +16,7 @@ import {
 } from 'chart.js'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
+import { useI18n } from '../../i18n/index.jsx'
 import {
   UserGroupIcon,
   UsersIcon,
@@ -38,6 +39,7 @@ ChartJS.register(
 )
 
 export default function AdminDashboard() {
+  const { t } = useI18n()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -79,7 +81,11 @@ export default function AdminDashboard() {
     datasets: [
       {
         data: stats?.students_by_department?.map((d) => d.count) || [],
-        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6'],
+        backgroundColor: (() => {
+          const palette = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#f97316', '#eab308', '#10b981', '#6366f1', '#a855f7']
+          const n = stats?.students_by_department?.length || 0
+          return Array.from({ length: n }, (_, i) => palette[i % palette.length])
+        })(),
         borderWidth: 0,
       },
     ],
@@ -136,38 +142,38 @@ export default function AdminDashboard() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Dashboard
+          {t('dashboard')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Welcome back! Here's what's happening at ESL University.
+          {t('welcome_admin')}
         </p>
       </motion.div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Total Students"
+          title={t('total_students')}
           value={stats?.stats?.total_students || 0}
           icon={UserGroupIcon}
           color="primary"
           delay={0}
         />
         <StatCard
-          title="Total Teachers"
+          title={t('total_teachers')}
           value={stats?.stats?.total_teachers || 0}
           icon={UsersIcon}
           color="blue"
           delay={0.1}
         />
         <StatCard
-          title="Total Courses"
+          title={t('total_courses')}
           value={stats?.stats?.total_courses || 0}
           icon={BookOpenIcon}
           color="purple"
           delay={0.2}
         />
         <StatCard
-          title="Departments"
+          title={t('total_departments')}
           value={stats?.stats?.total_departments || 0}
           icon={BuildingLibraryIcon}
           color="orange"
@@ -185,7 +191,7 @@ export default function AdminDashboard() {
           className="card p-6"
         >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Enrollment Trends
+            {t('enrollment_trends')}
           </h3>
           <div className="h-64">
             <Line data={enrollmentChartData} options={chartOptions} />
@@ -200,7 +206,7 @@ export default function AdminDashboard() {
           className="card p-6"
         >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Students by Department
+            {t('students_by_department')}
           </h3>
           <div className="h-64 flex items-center justify-center">
             <Doughnut
@@ -228,7 +234,7 @@ export default function AdminDashboard() {
           className="card p-6 lg:col-span-2"
         >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Students by Level
+            {t('students_by_level')}
           </h3>
           <div className="h-64">
             <Bar data={levelChartData} options={chartOptions} />

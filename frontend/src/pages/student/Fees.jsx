@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { useI18n } from '../../i18n/index.jsx'
 import { studentApi } from '../../services/api'
 import {
   CurrencyDollarIcon,
@@ -15,6 +16,7 @@ import { Link } from 'react-router-dom'
 
 export default function StudentFees() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [data, setData] = useState({ fees: [], summary: {} })
   const [loading, setLoading] = useState(true)
 
@@ -27,7 +29,7 @@ export default function StudentFees() {
       const response = await studentApi.getFees(user.student.id)
       setData(response.data.data)
     } catch (error) {
-      toast.error('Erreur lors du chargement des frais')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -37,10 +39,10 @@ export default function StudentFees() {
 
   const getStatusConfig = (status) => {
     const configs = {
-      paid: { label: 'Payé', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-      partial: { label: 'Partiel', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
-      pending: { label: 'En attente', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
-      overdue: { label: 'En retard', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
+      paid: { label: t('paid'), bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+      partial: { label: t('partial'), bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+      pending: { label: t('pending'), bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
+      overdue: { label: t('overdue'), bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
     }
     return configs[status] || configs.pending
   }
@@ -64,7 +66,7 @@ export default function StudentFees() {
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Frais de Scolarité</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('school_fees')}</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
           Année académique {new Date().getFullYear()} - {new Date().getFullYear() + 1}
         </p>
@@ -89,18 +91,18 @@ export default function StudentFees() {
         </div>
         <div className="flex-1">
           <h3 className={`font-semibold text-lg ${isPaid ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-            {isPaid ? 'Compte en règle' : 'Paiement en attente'}
+            {isPaid ? t('fees_paid_status') : t('fees_pending_status')}
           </h3>
           <p className={`text-sm ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {isPaid
-              ? 'Tous vos frais de scolarité sont à jour.'
-              : `Solde restant : ${formatCurrency(balance)} — Veuillez régulariser votre situation.`
+              ? t('fees_all_paid')
+              : `${t('remaining_balance')}: ${formatCurrency(balance)} — ${t('fees_please_settle')}`
             }
           </p>
           {!isPaid && totalFees > 0 && (
             <div className="mt-2">
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-red-500 dark:text-red-400">{paymentPercent}% payé</span>
+                <span className="text-red-500 dark:text-red-400">{paymentPercent}% {t('paid')}</span>
                 <span className="text-red-500 dark:text-red-400">{formatCurrency(paidAmount)} / {formatCurrency(totalFees)}</span>
               </div>
               <div className="h-2 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
@@ -114,7 +116,7 @@ export default function StudentFees() {
             to="/student/payment"
             className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
           >
-            Payer maintenant
+            {t('pay_now')}
           </Link>
         )}
       </motion.div>
@@ -125,22 +127,22 @@ export default function StudentFees() {
         animate={{ opacity: 1, y: 0 }}
         className="bg-white dark:bg-dark-200 rounded-lg border border-gray-200 dark:border-dark-100 p-6"
       >
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Récapitulatif</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('summary')}</h2>
         <div className="grid grid-cols-3 gap-8">
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total des frais</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t('total_fees')}</p>
             <p className="text-xl font-semibold text-gray-900 dark:text-white">
               {formatCurrency(data.summary?.total)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Montant payé</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t('amount_paid_label')}</p>
             <p className="text-xl font-semibold text-green-600 dark:text-green-400">
               {formatCurrency(data.summary?.paid)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Solde restant</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t('remaining_balance')}</p>
             <p className={`text-xl font-semibold ${
               (data.summary?.balance || 0) > 0 
                 ? 'text-red-600 dark:text-red-400' 
@@ -160,13 +162,13 @@ export default function StudentFees() {
         className="bg-white dark:bg-dark-200 rounded-lg border border-gray-200 dark:border-dark-100 overflow-hidden"
       >
         <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-100">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Détail des frais</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('fee_details')}</h2>
         </div>
 
         {data.fees?.length === 0 ? (
           <div className="p-8 text-center">
             <CurrencyDollarIcon className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">Aucun frais assigné pour le moment</p>
+            <p className="text-gray-500 dark:text-gray-400">{t('no_fees_assigned')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -174,22 +176,22 @@ export default function StudentFees() {
               <thead>
                 <tr className="bg-gray-50 dark:bg-dark-300">
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Type de frais
+                    {t('fee_type')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Montant
+                    {t('amount')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Payé
+                    {t('paid_col')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Balance
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Échéance
+                    {t('due_date')}
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Statut
+                    {t('status')}
                   </th>
                 </tr>
               </thead>
@@ -237,7 +239,7 @@ export default function StudentFees() {
                             ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                             : `${statusConfig.bg} ${statusConfig.text}`
                         }`}>
-                          {isOverdue ? 'En retard' : statusConfig.label}
+                          {isOverdue ? t('overdue') : statusConfig.label}
                         </span>
                       </td>
                     </tr>
@@ -258,7 +260,7 @@ export default function StudentFees() {
           className="bg-white dark:bg-dark-200 rounded-lg border border-gray-200 dark:border-dark-100 overflow-hidden"
         >
           <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-100">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Historique des paiements</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('payment_history')}</h2>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-dark-100">
             {data.fees

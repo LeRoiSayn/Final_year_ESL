@@ -20,10 +20,12 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import api, { studentApi, departmentApi, courseApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
 
 export default function UnifiedStudentManagement() {
+  const { t } = useI18n()
   // State for student list
   const [students, setStudents] = useState([])
   const [selectedStudent, setSelectedStudent] = useState(null)
@@ -79,7 +81,7 @@ export default function UnifiedStudentManagement() {
         })
       }
     } catch (error) {
-      toast.error('Failed to fetch students')
+      toast.error(t('error'))
     } finally {
       setIsLoadingList(false)
     }
@@ -100,7 +102,7 @@ export default function UnifiedStudentManagement() {
       const response = await api.get(`/student-management/${studentId}/profile`)
       setStudentProfile(response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch student profile')
+      toast.error(t('error'))
     } finally {
       setIsLoadingProfile(false)
     }
@@ -111,7 +113,7 @@ export default function UnifiedStudentManagement() {
       const response = await api.get(`/student-management/${studentId}/available-courses`)
       setAvailableCourses(response.data.data.available_courses || [])
     } catch (error) {
-      toast.error('Failed to fetch available courses')
+      toast.error(t('error'))
     }
   }
 
@@ -131,11 +133,11 @@ export default function UnifiedStudentManagement() {
       await api.post(`/student-management/${selectedStudent.id}/assign-course`, {
         course_id: courseId,
       })
-      toast.success('Course assigned successfully')
+      toast.success(t('course_assigned'))
       fetchStudentProfile(selectedStudent.id)
       fetchAvailableCourses(selectedStudent.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to assign course')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -146,16 +148,16 @@ export default function UnifiedStudentManagement() {
       await api.delete(`/student-management/${selectedStudent.id}/remove-course/${enrollmentId}`, {
         data: { reason: 'Removed by administrator' }
       })
-      toast.success('Course removed successfully')
+      toast.success(t('course_removed'))
       fetchStudentProfile(selectedStudent.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to remove course')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
   const handleBulkAssignCourses = async () => {
     if (selectedCourses.length === 0) {
-      toast.error('Please select at least one course')
+      toast.error(t('select_at_least_one_course'))
       return
     }
 
@@ -163,12 +165,12 @@ export default function UnifiedStudentManagement() {
       const response = await api.post(`/student-management/${selectedStudent.id}/bulk-assign-courses`, {
         course_ids: selectedCourses,
       })
-      toast.success(`${response.data.data.assigned.length} courses assigned successfully`)
+      toast.success(t('courses_assigned'))
       setShowBulkAssignModal(false)
       setSelectedCourses([])
       fetchStudentProfile(selectedStudent.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to assign courses')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 

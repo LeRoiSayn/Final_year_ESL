@@ -284,12 +284,18 @@ class GradeController extends Controller
 
     /**
      * Admin validates grades for a class.
-     * Notifies the teacher who submitted.
+     * Stamps validated_at, notifies teacher + all enrolled students.
      */
     public function validateClass(Request $request, int $classId)
     {
         $class = ClassModel::with(['course', 'teacher.user'])->findOrFail($classId);
         $courseName = $class->course->name ?? 'Cours ' . $classId;
+
+        // Stamp validated_at on all grades for this class
+        $adminId = $request->user()->id;
+        Grade::whereHas('enrollment', fn($q) => $q->where('class_id', $classId))
+            ->whereNull('validated_at')
+            ->update(['validated_at' => now(), 'validated_by' => $adminId]);
 
         // Notify the teacher
         if ($class->teacher && $class->teacher->user) {
@@ -302,14 +308,36 @@ class GradeController extends Controller
                 'data'    => [
                     'class_id'    => $classId,
                     'course_name' => $courseName,
-                    'validated_by'=> $request->user()->id,
+                    'validated_by'=> $adminId,
                 ],
             ]);
         }
 
-        // Also create admin-side record for tracking
+        // Notify all enrolled students
+        $enrollments = Enrollment::with('student.user')
+            ->where('class_id', $classId)
+            ->where('status', 'enrolled')
+            ->get();
+
+        foreach ($enrollments as $enrollment) {
+            if ($enrollment->student && $enrollment->student->user) {
+                Notification::create([
+                    'user_id' => $enrollment->student->user->id,
+                    'type'    => 'grades_validated',
+                    'title'   => 'Vos notes sont disponibles',
+                    'message' => "Les notes de {$courseName} ont été validées. Consultez votre relevé de notes.",
+                    'link'    => '/student/grades',
+                    'data'    => [
+                        'class_id'    => $classId,
+                        'course_name' => $courseName,
+                    ],
+                ]);
+            }
+        }
+
+        // Admin-side record for tracking
         Notification::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $adminId,
             'type'    => 'grades_validated',
             'title'   => 'Notes validées',
             'message' => "Vous avez validé les notes de {$courseName}.",

@@ -10,8 +10,10 @@ import {
   TrashIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function AdminDepartments() {
+  const { t } = useI18n()
   const [departments, setDepartments] = useState([])
   const [faculties, setFaculties] = useState([])
   const [loading, setLoading] = useState(true)
@@ -38,7 +40,7 @@ export default function AdminDepartments() {
       setDepartments(deptRes.data.data)
       setFaculties(facRes.data.data)
     } catch (error) {
-      toast.error('Failed to fetch data')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -49,17 +51,17 @@ export default function AdminDepartments() {
     try {
       if (editingDepartment) {
         await departmentApi.update(editingDepartment.id, formData)
-        toast.success('Department updated successfully')
+        toast.success(t('department_updated'))
       } else {
         await departmentApi.create(formData)
-        toast.success('Department created successfully')
+        toast.success(t('department_created'))
       }
       setModalOpen(false)
       setEditingDepartment(null)
       setFormData({ faculty_id: '', name: '', code: '', description: '', head_name: '' })
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Operation failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -79,20 +81,20 @@ export default function AdminDepartments() {
     if (!window.confirm(`Are you sure you want to delete ${dept.name}?`)) return
     try {
       await departmentApi.delete(dept.id)
-      toast.success('Department deleted successfully')
+      toast.success(t('department_deleted'))
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Delete failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
   const handleToggle = async (dept) => {
     try {
       await departmentApi.toggle(dept.id)
-      toast.success(`Department ${dept.is_active ? 'deactivated' : 'activated'}`)
+      toast.success(t(dept.is_active ? 'deactivated' : 'activated'))
       fetchData()
     } catch (error) {
-      toast.error('Toggle failed')
+      toast.error(t('error'))
     }
   }
 

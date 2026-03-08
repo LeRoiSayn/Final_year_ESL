@@ -18,8 +18,10 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline'
 import api, { teacherApi, departmentApi, courseApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function UnifiedTeacherManagement() {
+  const { t } = useI18n()
   // State for teacher list
   const [teachers, setTeachers] = useState([])
   const [selectedTeacher, setSelectedTeacher] = useState(null)
@@ -74,7 +76,7 @@ export default function UnifiedTeacherManagement() {
         })
       }
     } catch (error) {
-      toast.error('Failed to fetch teachers')
+      toast.error(t('error'))
     } finally {
       setIsLoadingList(false)
     }
@@ -95,7 +97,7 @@ export default function UnifiedTeacherManagement() {
       const response = await api.get(`/teacher-management/${teacherId}/profile`)
       setTeacherProfile(response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch teacher profile')
+      toast.error(t('error'))
     } finally {
       setIsLoadingProfile(false)
     }
@@ -106,7 +108,7 @@ export default function UnifiedTeacherManagement() {
       const response = await api.get(`/teacher-management/${teacherId}/available-courses`)
       setAvailableCourses(response.data.data.courses || [])
     } catch (error) {
-      toast.error('Failed to fetch available courses')
+      toast.error(t('error'))
     }
   }
 
@@ -126,11 +128,11 @@ export default function UnifiedTeacherManagement() {
       await api.post(`/teacher-management/${selectedTeacher.id}/assign-course`, {
         course_id: courseId,
       })
-      toast.success('Course assigned successfully')
+      toast.success(t('course_assigned'))
       fetchTeacherProfile(selectedTeacher.id)
       fetchAvailableCourses(selectedTeacher.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to assign course')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -141,16 +143,16 @@ export default function UnifiedTeacherManagement() {
       await api.delete(`/teacher-management/${selectedTeacher.id}/remove-course/${classId}`, {
         data: { unassign_only: true }
       })
-      toast.success('Course removed successfully')
+      toast.success(t('course_removed'))
       fetchTeacherProfile(selectedTeacher.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to remove course')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
   const handleBulkAssignCourses = async () => {
     if (selectedCourses.length === 0) {
-      toast.error('Please select at least one course')
+      toast.error(t('select_at_least_one_course'))
       return
     }
 
@@ -158,12 +160,12 @@ export default function UnifiedTeacherManagement() {
       const response = await api.post(`/teacher-management/${selectedTeacher.id}/bulk-assign-courses`, {
         course_ids: selectedCourses,
       })
-      toast.success(`${response.data.data.assigned.length} courses assigned successfully`)
+      toast.success(t('courses_assigned'))
       setShowBulkAssignModal(false)
       setSelectedCourses([])
       fetchTeacherProfile(selectedTeacher.id)
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to assign courses')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 

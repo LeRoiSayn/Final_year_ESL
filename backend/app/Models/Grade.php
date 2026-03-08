@@ -20,6 +20,8 @@ class Grade extends Model
         'remarks',
         'graded_by',
         'graded_at',
+        'validated_at',
+        'validated_by',
     ];
 
     protected $casts = [
@@ -29,6 +31,7 @@ class Grade extends Model
         'exam_score'           => 'decimal:2',
         'final_grade'          => 'decimal:2',
         'graded_at'            => 'datetime',
+        'validated_at'         => 'datetime',
     ];
 
     public function enrollment()

@@ -5,8 +5,10 @@ import { activityLogApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import { ClockIcon } from '@heroicons/react/24/outline'
 import { formatDistanceToNow } from 'date-fns'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function AdminActivityLog() {
+  const { t } = useI18n()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -19,7 +21,7 @@ export default function AdminActivityLog() {
       const response = await activityLogApi.getAll({ per_page: 100 })
       setLogs(response.data.data.data || response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch activity logs')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }

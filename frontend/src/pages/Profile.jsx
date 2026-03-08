@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useI18n } from '../i18n/index.jsx'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
@@ -11,10 +12,13 @@ import {
   KeyIcon,
   EyeIcon,
   EyeSlashIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Profile() {
   const { user, updateProfile, changePassword } = useAuth()
+  const { t } = useI18n()
+  const isRegistrar = user?.role === 'registrar'
   const [isEditing, setIsEditing] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [showPasswords, setShowPasswords] = useState({
@@ -52,7 +56,7 @@ export default function Profile() {
   const handlePasswordSubmit = async (e) => {
     e.preventDefault()
     if (passwordData.password !== passwordData.password_confirmation) {
-      toast.error('Passwords do not match')
+      toast.error(t('passwords_no_match'))
       return
     }
     setLoading(true)
@@ -80,11 +84,11 @@ export default function Profile() {
   }
 
   const roleLabels = {
-    admin: 'Administrator',
-    registrar: 'Registrar',
-    finance: 'Finance Officer',
-    teacher: 'Teacher',
-    student: 'Student',
+    admin: t('role_admin'),
+    registrar: t('role_registrar'),
+    finance: t('role_finance'),
+    teacher: t('role_teacher'),
+    student: t('role_student'),
   }
 
   return (
@@ -94,8 +98,8 @@ export default function Profile() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">My Profile</h1>
-        <p className="text-gray-500 dark:text-gray-400">Manage your account information</p>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('my_profile')}</h1>
+        <p className="text-gray-500 dark:text-gray-400">{t('profile_subtitle')}</p>
       </motion.div>
 
       {/* Profile Card */}
@@ -124,20 +128,30 @@ export default function Profile() {
               </h2>
               <p className="text-gray-500 dark:text-gray-400">{roleLabels[user?.role]}</p>
             </div>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="btn-secondary"
-            >
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </button>
+            {isRegistrar && (
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="btn-secondary"
+              >
+                {isEditing ? t('cancel') : t('edit_profile')}
+              </button>
+            )}
           </div>
 
-          {/* Profile Form */}
-          {isEditing ? (
+          {/* Read-only notice for non-registrar users */}
+          {!isRegistrar && (
+            <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <InformationCircleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">{t('profile_info_readonly')}</p>
+            </div>
+          )}
+
+          {/* Profile Form — only for registrar when editing */}
+          {isRegistrar && isEditing ? (
             <form onSubmit={handleProfileSubmit} className="mt-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">First Name</label>
+                  <label className="label">{t('first_name')}</label>
                   <input
                     type="text"
                     value={profileData.first_name}
@@ -147,7 +161,7 @@ export default function Profile() {
                   />
                 </div>
                 <div>
-                  <label className="label">Last Name</label>
+                  <label className="label">{t('last_name')}</label>
                   <input
                     type="text"
                     value={profileData.last_name}
@@ -157,7 +171,7 @@ export default function Profile() {
                   />
                 </div>
                 <div>
-                  <label className="label">Phone</label>
+                  <label className="label">{t('phone')}</label>
                   <input
                     type="tel"
                     value={profileData.phone}
@@ -166,7 +180,7 @@ export default function Profile() {
                   />
                 </div>
                 <div>
-                  <label className="label">Date of Birth</label>
+                  <label className="label">{t('date_of_birth')}</label>
                   <input
                     type="date"
                     value={profileData.date_of_birth}
@@ -175,7 +189,7 @@ export default function Profile() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">Address</label>
+                  <label className="label">{t('address')}</label>
                   <input
                     type="text"
                     value={profileData.address}
@@ -186,7 +200,7 @@ export default function Profile() {
               </div>
               <div className="flex justify-end">
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Changes'}
+                  {loading ? t('saving') : t('save_changes')}
                 </button>
               </div>
             </form>
@@ -232,22 +246,22 @@ export default function Profile() {
               <KeyIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Security</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Change your password</p>
+              <h3 className="font-semibold text-gray-900 dark:text-white">{t('security')}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('security_subtitle')}</p>
             </div>
           </div>
           <button
             onClick={() => setIsChangingPassword(!isChangingPassword)}
             className="btn-secondary"
           >
-            {isChangingPassword ? 'Cancel' : 'Change Password'}
+            {isChangingPassword ? t('cancel') : t('change_password')}
           </button>
         </div>
 
         {isChangingPassword && (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div>
-              <label className="label">Current Password</label>
+              <label className="label">{t('current_password')}</label>
               <div className="relative">
                 <input
                   type={showPasswords.current ? 'text' : 'password'}
@@ -266,7 +280,7 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="label">New Password</label>
+              <label className="label">{t('new_password')}</label>
               <div className="relative">
                 <input
                   type={showPasswords.new ? 'text' : 'password'}
@@ -286,7 +300,7 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="label">Confirm New Password</label>
+              <label className="label">{t('confirm_password')}</label>
               <div className="relative">
                 <input
                   type={showPasswords.confirm ? 'text' : 'password'}
@@ -306,7 +320,7 @@ export default function Profile() {
             </div>
             <div className="flex justify-end">
               <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Updating...' : 'Update Password'}
+                {loading ? t('updating') : t('save_changes')}
               </button>
             </div>
           </form>
@@ -315,3 +329,4 @@ export default function Profile() {
     </div>
   )
 }
+

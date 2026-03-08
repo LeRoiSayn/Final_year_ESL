@@ -5,7 +5,6 @@ import {
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
-  SwatchIcon,
   LanguageIcon,
   BellIcon,
   EnvelopeIcon,
@@ -23,7 +22,6 @@ const STORAGE_KEY = "esl_user_settings";
 
 const defaultSettings = {
   theme: "auto",
-  accent_color: "green",
   font_size: 100,
   language: "fr",
   email_notifications: true,
@@ -175,14 +173,7 @@ const Settings = () => {
     { id: "auto", nameKey: "theme_auto", icon: ComputerDesktopIcon },
   ];
 
-  const colors = [
-    { id: "green", nameKey: "color_green", class: "bg-green-500" },
-    { id: "blue", nameKey: "color_blue", class: "bg-blue-500" },
-    { id: "purple", nameKey: "color_purple", class: "bg-purple-500" },
-    { id: "orange", nameKey: "color_orange", class: "bg-orange-500" },
-    { id: "pink", nameKey: "color_pink", class: "bg-pink-500" },
-    { id: "teal", nameKey: "color_teal", class: "bg-teal-500" },
-  ];
+
 
   const availableWidgets = widgetsByRole[user?.role] || widgetsByRole.student;
 
@@ -232,7 +223,7 @@ const Settings = () => {
         className="bg-white dark:bg-dark-200 rounded-lg border border-gray-200 dark:border-dark-100 p-6"
       >
         <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-5 flex items-center gap-2">
-          <SwatchIcon className="w-5 h-5 text-primary-500" />
+          <SunIcon className="w-5 h-5 text-primary-500" />
           {t("appearance")}
         </h2>
 
@@ -269,27 +260,6 @@ const Settings = () => {
                   {t(theme.nameKey)}
                 </span>
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Accent Color */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            {t("accent_color")}
-          </label>
-          <div className="flex gap-3 flex-wrap">
-            {colors.map((color) => (
-              <button
-                key={color.id}
-                onClick={() => handleSettingChange("accent_color", color.id)}
-                className={`w-10 h-10 rounded-full ${color.class} transition-transform ${
-                  settings.accent_color === color.id
-                    ? "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-dark-200 ring-gray-400 scale-110"
-                    : "hover:scale-105"
-                }`}
-                title={t(color.nameKey)}
-              />
             ))}
           </div>
         </div>

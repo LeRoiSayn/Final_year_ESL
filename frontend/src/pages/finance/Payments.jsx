@@ -5,10 +5,12 @@ import { paymentApi, studentFeeApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
 import { PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 const PAYMENT_METHODS = ['cash', 'bank_transfer', 'mobile_money', 'check']
 
 export default function FinancePayments() {
+  const { t } = useI18n()
   const [payments, setPayments] = useState([])
   const [pendingFees, setPendingFees] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,12 +25,12 @@ export default function FinancePayments() {
       setPayments(payRes.data.data.data || payRes.data.data)
       const fees = feeRes.data.data.data || feeRes.data.data
       setPendingFees(fees.filter(f => f.status !== 'paid'))
-    } catch (error) { toast.error('Failed to fetch data') } finally { setLoading(false) }
+    } catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    try { await paymentApi.create(formData); toast.success('Payment recorded'); setModalOpen(false); setFormData({ student_fee_id: '', amount: '', payment_method: 'cash', payment_date: new Date().toISOString().split('T')[0], notes: '' }); fetchData() } 
+    try { await paymentApi.create(formData); toast.success(t('payment_recorded')); setModalOpen(false); setFormData({ student_fee_id: '', amount: '', payment_method: 'cash', payment_date: new Date().toISOString().split('T')[0], notes: '' }); fetchData() } 
     catch (error) { toast.error(error.response?.data?.message || 'Failed') }
   }
 
@@ -52,7 +54,7 @@ export default function FinancePayments() {
     { header: 'Date', accessor: (row) => new Date(row.payment_date).toLocaleDateString() },
     { header: 'Received By', accessor: (row) => row.received_by?.first_name ? `${row.received_by.first_name} ${row.received_by.last_name}` : 'System' },
     { header: 'Actions', cell: (row) => (
-      <button onClick={() => toast.success('Receipt generated for ' + row.reference_number)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100"><DocumentTextIcon className="w-4 h-4" /></button>
+      <button onClick={() => toast.success(t('receipt_generated'))} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100"><DocumentTextIcon className="w-4 h-4" /></button>
     )},
   ]
 

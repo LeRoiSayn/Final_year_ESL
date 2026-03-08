@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { studentApi, adminApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import DataTable from '../../components/DataTable'
 import {
   EyeIcon,
@@ -86,7 +87,8 @@ function SemesterSection({ sem, defaultOpen }) {
     future:  'bg-gray-100 text-gray-400',
   }[sem.status] ?? ''
 
-  const badgeLabel = { past: 'Terminé', current: 'En cours', future: 'À venir' }[sem.status]
+  const { t } = useI18n()
+  const badgeLabel = { past: t('semester_done'), current: t('semester_current'), future: t('semester_upcoming') }[sem.status]
 
   return (
     <div className="mb-2 border border-gray-100 dark:border-dark-100 rounded-lg overflow-hidden">
@@ -130,6 +132,7 @@ function SemesterSection({ sem, defaultOpen }) {
 /** Collapsible year accordion shown in the transcript */
 function YearSection({ yearData, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
+  const { t } = useI18n()
   const { year, year_label, is_current_year, is_past_year, semesters, year_stats } = yearData
 
   const headerCls = is_current_year
@@ -155,17 +158,17 @@ function YearSection({ yearData, defaultOpen }) {
 
         {is_current_year && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-800 dark:text-primary-200 font-medium">
-            Année en cours
+            {t('year_in_progress')}
           </span>
         )}
         {is_past_year && year_stats.is_year_passed && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-            ✓ Réussie
+            ✓ {t('year_passed')}
           </span>
         )}
         {is_past_year && !year_stats.is_year_passed && year_stats.failed > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-            Partiellement validée
+            {t('year_partial')}
           </span>
         )}
 
@@ -198,7 +201,7 @@ function StudentProfileModal({ studentId, onClose }) {
   useEffect(() => {
     adminApi.getStudentDetails(studentId)
       .then(res => setData(res.data))
-      .catch(() => toast.error('Erreur lors du chargement du profil'))
+      .catch(() => toast.error(t('error')))
       .finally(() => setLoading(false))
   }, [studentId])
 
@@ -343,6 +346,7 @@ function StudentProfileModal({ studentId, onClose }) {
 }
 
 export default function AdminStudents() {
+  const { t } = useI18n()
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedStudentId, setSelectedStudentId] = useState(null)
@@ -356,7 +360,7 @@ export default function AdminStudents() {
       const response = await studentApi.getAll({ per_page: 100 })
       setStudents(response.data.data.data || response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch students')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -364,7 +368,7 @@ export default function AdminStudents() {
 
   const columns = [
     {
-      header: 'Étudiant',
+      header: t('student'),
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-medium">
@@ -382,35 +386,34 @@ export default function AdminStudents() {
       accessor: (row) => row.user?.email,
     },
     {
-      header: 'Filière',
+      header: t('department'),
       accessor: (row) => row.department?.name,
     },
     {
-      header: 'Niveau',
+      header: t('level'),
       cell: (row) => <span className="badge badge-info">{row.level}</span>,
     },
     {
-      header: 'Statut',
+      header: t('status'),
       cell: (row) => (
         <span className={`badge ${
           row.status === 'active' ? 'badge-success' :
           row.status === 'graduated' ? 'badge-info' : 'badge-warning'
         }`}>
-          {row.status}
+          {t(row.status) || row.status}
         </span>
       ),
     },
     {
-      header: 'Inscription',
-      accessor: (row) => row.enrollment_date ? new Date(row.enrollment_date).toLocaleDateString('fr-FR') : '—',
+      header: t('enrollment_date'),
+      accessor: (row) => row.enrollment_date ? new Date(row.enrollment_date).toLocaleDateString() : '—',
     },
     {
-      header: 'Profil',
+      header: t('profile_title'),
       cell: (row) => (
         <button
           onClick={() => setSelectedStudentId(row.id)}
           className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 text-primary-600"
-          title="Voir le profil académique complet"
         >
           <EyeIcon className="w-4 h-4" />
         </button>
@@ -422,10 +425,10 @@ export default function AdminStudents() {
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Étudiants
+          {t('students')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Cliquez sur l'icône <EyeIcon className="inline w-4 h-4 text-primary-500" /> pour voir le profil académique complet d'un étudiant.
+          {t('students_subtitle')}
         </p>
       </motion.div>
 
@@ -434,7 +437,7 @@ export default function AdminStudents() {
           columns={columns}
           data={students}
           loading={loading}
-          searchPlaceholder="Rechercher un étudiant..."
+          searchPlaceholder={t('search_students')}
         />
       </motion.div>
 

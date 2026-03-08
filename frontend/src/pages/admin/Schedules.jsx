@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { scheduleApi, classApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import {
   CalendarIcon,
   ClockIcon,
@@ -13,14 +14,7 @@ import {
   AcademicCapIcon,
 } from '@heroicons/react/24/outline'
 
-const DAYS = [
-  { key: 'monday', label: 'Lundi' },
-  { key: 'tuesday', label: 'Mardi' },
-  { key: 'wednesday', label: 'Mercredi' },
-  { key: 'thursday', label: 'Jeudi' },
-  { key: 'friday', label: 'Vendredi' },
-  { key: 'saturday', label: 'Samedi' },
-]
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 const DAY_COLORS = {
   monday: 'from-blue-500/10 to-blue-600/10 border-blue-300 dark:border-blue-800',
@@ -32,6 +26,7 @@ const DAY_COLORS = {
 }
 
 export default function AdminSchedules() {
+  const { t } = useI18n()
   const [schedules, setSchedules] = useState([])
   const [classes, setClasses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -43,6 +38,8 @@ export default function AdminSchedules() {
     start_time: '08:00',
     end_time: '10:00',
     room: '',
+    midterm_date: '',
+    final_date: '',
   })
 
   useEffect(() => {
@@ -59,7 +56,7 @@ export default function AdminSchedules() {
       const classData = classRes.data.data
       setClasses(classData?.data || classData || [])
     } catch (error) {
-      toast.error('Erreur lors du chargement')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -70,17 +67,17 @@ export default function AdminSchedules() {
     try {
       if (editingSchedule) {
         await scheduleApi.update(editingSchedule.id, formData)
-        toast.success('Horaire modifié avec succès')
+        toast.success(t('schedule_saved'))
       } else {
         await scheduleApi.create(formData)
-        toast.success('Horaire créé avec succès')
+        toast.success(t('schedule_created'))
       }
       setShowModal(false)
       setEditingSchedule(null)
       resetForm()
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erreur lors de la sauvegarde')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -92,18 +89,20 @@ export default function AdminSchedules() {
       start_time: schedule.start_time?.substring(0, 5) || '08:00',
       end_time: schedule.end_time?.substring(0, 5) || '10:00',
       room: schedule.room || '',
+      midterm_date: schedule.midterm_date || '',
+      final_date: schedule.final_date || '',
     })
     setShowModal(true)
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet horaire ?')) return
+    if (!confirm(t('delete_schedule_confirm'))) return
     try {
       await scheduleApi.delete(id)
-      toast.success('Horaire supprimé')
+      toast.success(t('schedule_deleted'))
       fetchData()
     } catch (error) {
-      toast.error('Erreur lors de la suppression')
+      toast.error(t('error'))
     }
   }
 
@@ -114,6 +113,8 @@ export default function AdminSchedules() {
       start_time: '08:00',
       end_time: '10:00',
       room: '',
+      midterm_date: '',
+      final_date: '',
     })
   }
 
@@ -125,7 +126,7 @@ export default function AdminSchedules() {
 
   // Group schedules by day
   const groupedByDay = DAYS.reduce((acc, day) => {
-    acc[day.key] = schedules.filter((s) => s.day_of_week === day.key)
+    acc[day] = schedules.filter((s) => s.day_of_week === day)
     return acc
   }, {})
 
@@ -152,10 +153,10 @@ export default function AdminSchedules() {
       >
         <div>
           <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-            Emploi du Temps
+            {t('schedules')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Gérez les horaires de cours pour toutes les classes
+            {t('schedules_subtitle')}
           </p>
         </div>
         <button
@@ -163,7 +164,7 @@ export default function AdminSchedules() {
           className="btn-primary inline-flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
-          Ajouter un horaire
+          {t('add_schedule')}
         </button>
       </motion.div>
 
@@ -175,25 +176,25 @@ export default function AdminSchedules() {
       >
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-primary-600">{schedules.length}</p>
-          <p className="text-sm text-gray-500">Total horaires</p>
+          <p className="text-sm text-gray-500">{t('total_schedules')}</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-blue-600">
             {new Set(schedules.map((s) => s.class_id)).size}
           </p>
-          <p className="text-sm text-gray-500">Classes planifiées</p>
+          <p className="text-sm text-gray-500">{t('planned_classes')}</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-green-600">
             {new Set(schedules.map((s) => s.day_of_week)).size}
           </p>
-          <p className="text-sm text-gray-500">Jours actifs</p>
+          <p className="text-sm text-gray-500">{t('active_days')}</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-2xl font-bold text-purple-600">
             {new Set(schedules.filter((s) => s.room).map((s) => s.room)).size}
           </p>
-          <p className="text-sm text-gray-500">Salles utilisées</p>
+          <p className="text-sm text-gray-500">{t('rooms_used')}</p>
         </div>
       </motion.div>
 
@@ -204,19 +205,19 @@ export default function AdminSchedules() {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
       >
         {DAYS.map((day) => (
-          <div key={day.key} className="card overflow-hidden">
-            <div className={`px-5 py-3 bg-gradient-to-r ${DAY_COLORS[day.key]} border-b`}>
+          <div key={day} className="card overflow-hidden">
+            <div className={`px-5 py-3 bg-gradient-to-r ${DAY_COLORS[day]} border-b`}>
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-primary-500" />
-                {day.label}
+                {t(day)}
                 <span className="text-sm font-normal text-gray-500 ml-auto">
-                  {groupedByDay[day.key].length} cours
+                  {groupedByDay[day].length} {t('courses_label')}
                 </span>
               </h3>
             </div>
             <div className="p-4 space-y-3">
-              {groupedByDay[day.key].length > 0 ? (
-                groupedByDay[day.key]
+              {groupedByDay[day].length > 0 ? (
+                groupedByDay[day]
                   .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
                   .map((schedule) => (
                     <div
@@ -226,7 +227,7 @@ export default function AdminSchedules() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 dark:text-white truncate">
-                            {schedule.class?.course?.name || 'Cours'}
+                            {schedule.class?.course?.name || t('course')}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {schedule.class?.course?.code} • {schedule.class?.name}
@@ -264,11 +265,25 @@ export default function AdminSchedules() {
                           👨‍🏫 {schedule.class.teacher.user.first_name} {schedule.class.teacher.user.last_name}
                         </p>
                       )}
+                      {(schedule.midterm_date || schedule.final_date) && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {schedule.midterm_date && (
+                            <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                              📝 {t('midterm_exam')}: {schedule.midterm_date}
+                            </span>
+                          )}
+                          {schedule.final_date && (
+                            <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-full">
+                              🎓 {t('final_exam')}: {schedule.final_date}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))
               ) : (
                 <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
-                  Aucun cours programmé
+                  {t('no_classes_for_day')}
                 </p>
               )}
             </div>
@@ -288,7 +303,7 @@ export default function AdminSchedules() {
             >
               <div className="p-6 border-b border-gray-200 dark:border-dark-100 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {editingSchedule ? 'Modifier un horaire' : 'Ajouter un horaire'}
+                  {editingSchedule ? t('edit_schedule') : t('add_schedule')}
                 </h2>
                 <button
                   onClick={() => { setShowModal(false); setEditingSchedule(null) }}
@@ -302,7 +317,7 @@ export default function AdminSchedules() {
                 {/* Class selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Classe *
+                    {t('schedule_class_label')} *
                   </label>
                   <select
                     value={formData.class_id}
@@ -310,7 +325,7 @@ export default function AdminSchedules() {
                     className="w-full px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
                     required
                   >
-                    <option value="">Sélectionner une classe</option>
+                    <option value="">{t('select_class')}</option>
                     {classes
                       .filter((c) => c.is_active)
                       .map((cls) => (
@@ -324,7 +339,7 @@ export default function AdminSchedules() {
                 {/* Day */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Jour *
+                    {t('schedule_day_label')} *
                   </label>
                   <select
                     value={formData.day_of_week}
@@ -333,9 +348,7 @@ export default function AdminSchedules() {
                     required
                   >
                     {DAYS.map((day) => (
-                      <option key={day.key} value={day.key}>
-                        {day.label}
-                      </option>
+                      <option key={day} value={day}>{t(day)}</option>
                     ))}
                   </select>
                 </div>
@@ -344,7 +357,7 @@ export default function AdminSchedules() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Heure début *
+                      {t('start_time')} *
                     </label>
                     <input
                       type="time"
@@ -356,7 +369,7 @@ export default function AdminSchedules() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Heure fin *
+                      {t('end_time')} *
                     </label>
                     <input
                       type="time"
@@ -371,15 +384,41 @@ export default function AdminSchedules() {
                 {/* Room */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Salle
+                    {t('room')}
                   </label>
                   <input
                     type="text"
                     value={formData.room}
                     onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                    placeholder="Ex: Salle A101, Amphithéâtre 1..."
+                    placeholder={t('room')}
                     className="w-full px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white placeholder-gray-400"
                   />
+                </div>
+
+                {/* Exam dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      📝 {t('midterm_date')}
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.midterm_date}
+                      onChange={(e) => setFormData({ ...formData, midterm_date: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      🎓 {t('final_date')}
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.final_date}
+                      onChange={(e) => setFormData({ ...formData, final_date: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
+                    />
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -389,13 +428,13 @@ export default function AdminSchedules() {
                     onClick={() => { setShowModal(false); setEditingSchedule(null) }}
                     className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-dark-200 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-100 transition-colors"
                   >
-                    Annuler
+                    {t('cancel')}
                   </button>
                   <button
                     type="submit"
                     className="flex-1 px-4 py-2.5 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors"
                   >
-                    {editingSchedule ? 'Modifier' : 'Créer'}
+                    {editingSchedule ? t('update') : t('create')}
                   </button>
                 </div>
               </form>

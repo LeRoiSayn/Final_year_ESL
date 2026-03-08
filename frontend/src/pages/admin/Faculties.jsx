@@ -10,8 +10,10 @@ import {
   TrashIcon,
   BuildingLibraryIcon,
 } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function AdminFaculties() {
+  const { t } = useI18n()
   const [faculties, setFaculties] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -32,7 +34,7 @@ export default function AdminFaculties() {
       const response = await facultyApi.getAll()
       setFaculties(response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch faculties')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -43,17 +45,17 @@ export default function AdminFaculties() {
     try {
       if (editingFaculty) {
         await facultyApi.update(editingFaculty.id, formData)
-        toast.success('Faculty updated successfully')
+        toast.success(t('faculty_updated'))
       } else {
         await facultyApi.create(formData)
-        toast.success('Faculty created successfully')
+        toast.success(t('faculty_created'))
       }
       setModalOpen(false)
       setEditingFaculty(null)
       setFormData({ name: '', code: '', description: '', dean_name: '' })
       fetchFaculties()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Operation failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
@@ -72,20 +74,20 @@ export default function AdminFaculties() {
     if (!window.confirm(`Are you sure you want to delete ${faculty.name}?`)) return
     try {
       await facultyApi.delete(faculty.id)
-      toast.success('Faculty deleted successfully')
+      toast.success(t('faculty_deleted'))
       fetchFaculties()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Delete failed')
+      toast.error(error.response?.data?.message || t('error'))
     }
   }
 
   const handleToggle = async (faculty) => {
     try {
       await facultyApi.toggle(faculty.id)
-      toast.success(`Faculty ${faculty.is_active ? 'deactivated' : 'activated'}`)
+      toast.success(t(faculty.is_active ? 'deactivated' : 'activated'))
       fetchFaculties()
     } catch (error) {
-      toast.error('Toggle failed')
+      toast.error(t('error'))
     }
   }
 

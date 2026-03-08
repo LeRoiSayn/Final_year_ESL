@@ -5,8 +5,10 @@ import { feeTypeApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
 import { PlusIcon, PencilIcon, TrashIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline'
+import { useI18n } from '../../i18n/index.jsx'
 
 export default function FinanceFeeTypes() {
+  const { t } = useI18n()
   const [feeTypes, setFeeTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -17,21 +19,21 @@ export default function FinanceFeeTypes() {
 
   const fetchData = async () => {
     try { const response = await feeTypeApi.getAll(); setFeeTypes(response.data.data) } 
-    catch (error) { toast.error('Failed to fetch fee types') } finally { setLoading(false) }
+    catch (error) { toast.error(t('error')) } finally { setLoading(false) }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      if (editing) { await feeTypeApi.update(editing.id, formData); toast.success('Updated') } 
-      else { await feeTypeApi.create(formData); toast.success('Created') }
+      if (editing) { await feeTypeApi.update(editing.id, formData); toast.success(t('item_updated')) } 
+      else { await feeTypeApi.create(formData); toast.success(t('item_created')) }
       setModalOpen(false); setEditing(null); setFormData({ name: '', description: '', amount: '', is_mandatory: true }); fetchData()
     } catch (error) { toast.error(error.response?.data?.message || 'Failed') }
   }
 
   const handleEdit = (item) => { setEditing(item); setFormData({ name: item.name, description: item.description || '', amount: item.amount, is_mandatory: item.is_mandatory }); setModalOpen(true) }
-  const handleDelete = async (item) => { if (!window.confirm('Delete?')) return; try { await feeTypeApi.delete(item.id); toast.success('Deleted'); fetchData() } catch (error) { toast.error('Failed') } }
-  const handleToggle = async (item) => { try { await feeTypeApi.toggle(item.id); toast.success(`${item.is_active ? 'Deactivated' : 'Activated'}`); fetchData() } catch (error) { toast.error('Failed') } }
+  const handleDelete = async (item) => { if (!window.confirm('Delete?')) return; try { await feeTypeApi.delete(item.id); toast.success(t('item_deleted')); fetchData() } catch (error) { toast.error(t('error')) } }
+  const handleToggle = async (item) => { try { await feeTypeApi.toggle(item.id); toast.success(t(item.is_active ? 'deactivated' : 'activated')); fetchData() } catch (error) { toast.error(t('error')) } }
 
   const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
 

@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { teacherApi } from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 import DataTable from '../../components/DataTable'
 import { UsersIcon, EyeIcon } from '@heroicons/react/24/outline'
 
 export default function AdminTeachers() {
+  const { t } = useI18n()
   const [teachers, setTeachers] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -18,7 +20,7 @@ export default function AdminTeachers() {
       const response = await teacherApi.getAll({ per_page: 100 })
       setTeachers(response.data.data.data || response.data.data)
     } catch (error) {
-      toast.error('Failed to fetch teachers')
+      toast.error(t('error'))
     } finally {
       setLoading(false)
     }
@@ -26,7 +28,7 @@ export default function AdminTeachers() {
 
   const columns = [
     {
-      header: 'Teacher',
+      header: t('teacher'),
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium">
@@ -44,33 +46,33 @@ export default function AdminTeachers() {
       accessor: (row) => row.user?.email,
     },
     {
-      header: 'Department',
+      header: t('department'),
       accessor: (row) => row.department?.name,
     },
     {
-      header: 'Qualification',
+      header: t('qualification'),
       accessor: 'qualification',
     },
     {
-      header: 'Specialization',
+      header: t('specialization'),
       accessor: (row) => row.specialization || '-',
     },
     {
-      header: 'Status',
+      header: t('status'),
       cell: (row) => (
         <span className={`badge ${
           row.status === 'active' ? 'badge-success' : 
           row.status === 'on_leave' ? 'badge-warning' : 'badge-danger'
         }`}>
-          {row.status}
+          {t(row.status) || row.status}
         </span>
       ),
     },
     {
-      header: 'Actions',
+      header: t('actions'),
       cell: (row) => (
         <button
-          onClick={() => toast.success(`View ${row.user?.first_name}'s profile`)}
+          onClick={() => {}}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100 text-gray-600 dark:text-gray-400"
         >
           <EyeIcon className="w-4 h-4" />
@@ -86,10 +88,10 @@ export default function AdminTeachers() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Teachers
+          {t('teachers')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          View all registered teachers
+          {t('teachers_subtitle')}
         </p>
       </motion.div>
 
@@ -102,7 +104,7 @@ export default function AdminTeachers() {
           columns={columns}
           data={teachers}
           loading={loading}
-          searchPlaceholder="Search teachers..."
+          searchPlaceholder={t('search_teachers')}
         />
       </motion.div>
     </div>

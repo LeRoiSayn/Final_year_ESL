@@ -20,9 +20,11 @@ import {
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { useI18n } from "../../i18n/index.jsx";
 
 const StudentELearning = () => {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("courses");
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [onlineCourses, setOnlineCourses] = useState([]);
@@ -116,10 +118,10 @@ const StudentELearning = () => {
       const response = await api.post(`/elearning/courses/${courseId}/join`);
       if (response.data.meeting_url) {
         window.open(response.data.meeting_url, "_blank");
-        toast.success("Connexion au cours en direct");
+        toast.success(t('joining_live_course'));
       }
     } catch (error) {
-      toast.error(error.response?.data?.error || "Erreur de connexion");
+      toast.error(error.response?.data?.error || t('error'));
     }
   };
 
@@ -138,9 +140,9 @@ const StudentELearning = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Téléchargement démarré");
+      toast.success(t('download_started'));
     } catch (error) {
-      toast.error("Erreur lors du téléchargement");
+      toast.error(t('error'));
     }
   };
 
@@ -154,7 +156,7 @@ const StudentELearning = () => {
       setQuizAnswers({});
     } catch (error) {
       toast.error(
-        error.response?.data?.error || "Impossible de démarrer le quiz",
+        error.response?.data?.error || t('error'),
       );
     }
   };
@@ -177,7 +179,7 @@ const StudentELearning = () => {
           selectedCourse.course_id || selectedCourse.class?.course_id,
         );
     } catch (error) {
-      toast.error("Erreur lors de la soumission");
+      toast.error(t('error'));
     }
   };
 
@@ -443,7 +445,7 @@ const StudentELearning = () => {
 
     const handleSubmit = async () => {
       if (!content && !file) {
-        toast.error("Veuillez ajouter du contenu ou un fichier");
+        toast.error(t('add_content_or_file'));
         return;
       }
 
@@ -460,7 +462,7 @@ const StudentELearning = () => {
             headers: { "Content-Type": "multipart/form-data" },
           },
         );
-        toast.success("Devoir soumis avec succès!");
+        toast.success(t('assignment_submitted'));
         setShowSubmissionModal(null);
         if (selectedCourse)
           fetchAssignments(
@@ -468,7 +470,7 @@ const StudentELearning = () => {
           );
       } catch (error) {
         toast.error(
-          error.response?.data?.error || "Erreur lors de la soumission",
+          error.response?.data?.error || t('error'),
         );
       } finally {
         setIsSubmitting(false);

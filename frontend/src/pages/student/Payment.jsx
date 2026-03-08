@@ -11,8 +11,10 @@ import {
   BookmarkIcon,
 } from '@heroicons/react/24/outline'
 import api from '../../services/api'
+import { useI18n } from '../../i18n/index.jsx'
 
 const Payment = () => {
+  const { t } = useI18n()
   const [paymentHistory, setPaymentHistory] = useState([])
   const [savedMethods, setSavedMethods] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -53,11 +55,11 @@ const Payment = () => {
     const [errors, setErrors] = useState({})
 
     const purposes = [
-      { id: 'registration', name: 'Frais d\'inscription' },
-      { id: 'tuition', name: 'Frais de scolarité' },
-      { id: 'exam', name: 'Frais d\'examen' },
-      { id: 'library', name: 'Frais de bibliothèque' },
-      { id: 'other', name: 'Autre' },
+      { id: 'registration', name: t('registration_fee') },
+      { id: 'tuition', name: t('tuition_fee') },
+      { id: 'exam', name: t('exam_fee') },
+      { id: 'library', name: t('library_fee') },
+      { id: 'other', name: t('other') },
     ]
 
     const formatCardNumber = (value) => {
@@ -77,23 +79,23 @@ const Payment = () => {
 
     const validateForm = () => {
       const newErrors = {}
-      if (!amount || parseInt(amount) < 1000) newErrors.amount = 'Montant minimum: 1,000 FCFA'
-      if (!purpose) newErrors.purpose = 'Sélectionnez l\'objet du paiement'
-      if (!paymentMethod) newErrors.method = 'Sélectionnez un mode de paiement'
+      if (!amount || parseInt(amount) < 1000) newErrors.amount = t('amount_min')
+      if (!purpose) newErrors.purpose = t('select_payment_purpose')
+      if (!paymentMethod) newErrors.method = t('select_payment_method')
 
       if (paymentMethod === 'card') {
         if (!cardDetails.number || cardDetails.number.replace(/\s/g, '').length < 16)
-          newErrors.cardNumber = 'Numéro de carte invalide'
+          newErrors.cardNumber = t('invalid_card_number')
         if (!cardDetails.expiry || !/^\d{2}\/\d{2}$/.test(cardDetails.expiry))
-          newErrors.expiry = 'Date invalide (MM/AA)'
+          newErrors.expiry = t('invalid_expiry')
         if (!cardDetails.cvv || cardDetails.cvv.length < 3)
-          newErrors.cvv = 'CVV invalide'
-        if (!cardDetails.name) newErrors.name = 'Nom requis'
+          newErrors.cvv = t('invalid_cvv')
+        if (!cardDetails.name) newErrors.name = t('name_required')
       }
 
       if (paymentMethod === 'paypal') {
         if (!paypalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail))
-          newErrors.paypalEmail = 'Email invalide'
+          newErrors.paypalEmail = t('invalid_email')
       }
 
       setErrors(newErrors)
@@ -149,10 +151,10 @@ const Payment = () => {
 
         if (response.data.status === 'completed') {
           fetchData()
-          toast.success('Paiement effectué avec succès!')
+          toast.success(t('payment_success'))
         }
       } catch (error) {
-        toast.error(error.response?.data?.error || 'Erreur lors du paiement')
+        toast.error(error.response?.data?.error || t('payment_error'))
         setPaymentStatus({ status: 'failed' })
         setStep(3)
       } finally {
@@ -171,7 +173,7 @@ const Payment = () => {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <LockClosedIcon className="w-5 h-5 text-green-500" />
-              <h2 className="font-semibold text-gray-900 dark:text-white">Paiement sécurisé</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">{t('secure_payment')}</h2>
             </div>
             <button
               onClick={() => setShowPaymentModal(false)}
@@ -186,14 +188,14 @@ const Payment = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Objet du paiement
+                  {t('payment_purpose')}
                 </label>
                 <select
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
                   className={`w-full p-3 rounded-lg border ${errors.purpose ? 'border-red-500' : 'border-gray-200 dark:border-dark-100'} bg-white dark:bg-dark-300 text-gray-900 dark:text-white`}
                 >
-                  <option value="">Sélectionner...</option>
+                  <option value="">{t('select_placeholder')}</option>
                   {purposes.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -203,7 +205,7 @@ const Payment = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Montant (FCFA)
+                  {t('amount_fcfa')}
                 </label>
                 <input
                   type="number"
@@ -221,7 +223,7 @@ const Payment = () => {
                   onClick={() => setShowPaymentModal(false)}
                   className="flex-1 py-2.5 border border-gray-200 dark:border-dark-100 text-gray-700 dark:text-gray-300 rounded-lg font-medium"
                 >
-                  Annuler
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -230,7 +232,7 @@ const Payment = () => {
                   }}
                   className="flex-1 py-2.5 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600"
                 >
-                  Continuer
+                  {t('continue')}
                 </button>
               </div>
             </div>
@@ -240,19 +242,19 @@ const Payment = () => {
           {step === 2 && (
             <div className="p-6 space-y-4">
               <div className="text-center pb-4 border-b border-gray-200 dark:border-dark-100">
-                <p className="text-sm text-gray-500">Montant à payer</p>
+                <p className="text-sm text-gray-500">{t('amount_to_pay')}</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(parseInt(amount))}</p>
                 <p className="text-sm text-gray-500">{purposes.find(p => p.id === purpose)?.name}</p>
               </div>
 
               {/* Payment Methods */}
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Mode de paiement</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('payment_method_label')}</p>
                 
                 {/* Saved Methods */}
                 {savedMethods.length > 0 && (
                   <div className="space-y-2 pb-3 border-b border-gray-200 dark:border-dark-100">
-                    <p className="text-xs text-gray-500">Méthodes enregistrées</p>
+                    <p className="text-xs text-gray-500">{t('saved_methods')}</p>
                     {savedMethods.map(method => (
                       <button
                         key={method.id}
@@ -287,7 +289,7 @@ const Payment = () => {
                     <CreditCardIcon className="w-5 h-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-gray-900 dark:text-white">Carte bancaire</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{t('credit_card')}</p>
                     <p className="text-xs text-gray-500">Visa, Mastercard</p>
                   </div>
                 </button>
@@ -306,7 +308,7 @@ const Payment = () => {
                   </div>
                   <div className="text-left">
                     <p className="font-medium text-gray-900 dark:text-white">PayPal</p>
-                    <p className="text-xs text-gray-500">Paiement sécurisé</p>
+                    <p className="text-xs text-gray-500">{t('secure_payment')}</p>
                   </div>
                 </button>
               </div>
@@ -315,7 +317,7 @@ const Payment = () => {
               {paymentMethod === 'card' && (
                 <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-dark-100">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Numéro de carte</label>
+                    <label className="block text-xs text-gray-500 mb-1">{t('card_number')}</label>
                     <input
                       type="text"
                       value={cardDetails.number}
@@ -327,7 +329,7 @@ const Payment = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Expiration</label>
+                      <label className="block text-xs text-gray-500 mb-1">{t('expiry')}</label>
                       <input
                         type="text"
                         value={cardDetails.expiry}
@@ -350,7 +352,7 @@ const Payment = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Nom sur la carte</label>
+                    <label className="block text-xs text-gray-500 mb-1">{t('card_name')}</label>
                     <input
                       type="text"
                       value={cardDetails.name}
@@ -367,7 +369,7 @@ const Payment = () => {
                       className="w-4 h-4 rounded text-primary-500"
                     />
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Enregistrer pour les prochains paiements
+                      {t('save_card')}
                     </span>
                   </label>
                 </div>
@@ -376,7 +378,7 @@ const Payment = () => {
               {/* PayPal Email */}
               {paymentMethod === 'paypal' && (
                 <div className="pt-4 border-t border-gray-200 dark:border-dark-100">
-                  <label className="block text-xs text-gray-500 mb-1">Email PayPal</label>
+                  <label className="block text-xs text-gray-500 mb-1">{t('paypal_email')}</label>
                   <input
                     type="email"
                     value={paypalEmail}
@@ -384,7 +386,7 @@ const Payment = () => {
                     placeholder="votre@email.com"
                     className={`w-full p-2.5 rounded-lg border ${errors.paypalEmail ? 'border-red-500' : 'border-gray-200 dark:border-dark-100'} bg-white dark:bg-dark-300 text-gray-900 dark:text-white text-sm`}
                   />
-                  <p className="text-xs text-gray-500 mt-2">Vous serez redirigé vers PayPal pour confirmer</p>
+                  <p className="text-xs text-gray-500 mt-2">{t('paypal_redirect')}</p>
                 </div>
               )}
 
@@ -393,7 +395,7 @@ const Payment = () => {
                   onClick={() => setStep(1)}
                   className="flex-1 py-2.5 border border-gray-200 dark:border-dark-100 text-gray-700 dark:text-gray-300 rounded-lg font-medium"
                 >
-                  Retour
+                  {t('back')}
                 </button>
                 <button
                   onClick={processPayment}
@@ -405,7 +407,7 @@ const Payment = () => {
                   ) : (
                     <>
                       <LockClosedIcon className="w-4 h-4" />
-                      Payer
+                      {t('pay')}
                     </>
                   )}
                 </button>
@@ -422,9 +424,9 @@ const Payment = () => {
                     <ClockIcon className="w-8 h-8 text-yellow-500 animate-pulse" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Traitement en cours...
+                    {t('processing_payment')}
                   </h3>
-                  <p className="text-gray-500 text-sm mb-4">Veuillez patienter</p>
+                  <p className="text-gray-500 text-sm mb-4">{t('wait_please')}</p>
                   <p className="text-xs text-gray-400">Réf: {paymentStatus.reference}</p>
                 </>
               )}
@@ -439,7 +441,7 @@ const Payment = () => {
                     <CheckCircleIcon className="w-8 h-8 text-green-500" />
                   </motion.div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Paiement réussi!
+                    {t('payment_success_title')}
                   </h3>
                   <p className="text-gray-500 text-sm mb-1">{formatCurrency(paymentStatus.amount)}</p>
                   <p className="text-gray-400 text-xs mb-4">{paymentStatus.purpose}</p>
@@ -448,7 +450,7 @@ const Payment = () => {
                     onClick={() => setShowPaymentModal(false)}
                     className="w-full py-2.5 bg-primary-500 text-white rounded-lg font-medium"
                   >
-                    Fermer
+                    {t('close')}
                   </button>
                 </>
               )}
@@ -459,21 +461,21 @@ const Payment = () => {
                     <XCircleIcon className="w-8 h-8 text-red-500" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Échec du paiement
+                    {t('payment_failed')}
                   </h3>
-                  <p className="text-gray-500 text-sm mb-4">Une erreur s'est produite</p>
+                  <p className="text-gray-500 text-sm mb-4">{t('payment_error')}</p>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowPaymentModal(false)}
                       className="flex-1 py-2.5 border border-gray-200 dark:border-dark-100 text-gray-700 dark:text-gray-300 rounded-lg"
                     >
-                      Fermer
+                      {t('close')}
                     </button>
                     <button
                       onClick={() => { setStep(2); setPaymentStatus(null) }}
                       className="flex-1 py-2.5 bg-primary-500 text-white rounded-lg font-medium"
                     >
-                      Réessayer
+                      {t('try_again')}
                     </button>
                   </div>
                 </>
@@ -499,9 +501,9 @@ const Payment = () => {
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Paiement</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('payment')}</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Effectuez vos paiements en toute sécurité
+          {t('payment_subtitle')}
         </p>
       </motion.div>
 
@@ -513,9 +515,9 @@ const Payment = () => {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Nouveau paiement</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('new_payment')}</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Carte bancaire ou PayPal acceptés
+              {t('card_or_paypal')}
             </p>
           </div>
           <button
@@ -523,13 +525,13 @@ const Payment = () => {
             className="px-5 py-2.5 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors flex items-center gap-2"
           >
             <CreditCardIcon className="w-5 h-5" />
-            Payer
+            {t('pay')}
           </button>
         </div>
 
         {/* Payment Methods Icons */}
         <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-dark-100">
-          <span className="text-xs text-gray-500">Méthodes acceptées:</span>
+          <span className="text-xs text-gray-500">{t('accepted_methods')}</span>
           <div className="flex items-center gap-2">
             <div className="px-3 py-1.5 bg-gray-100 dark:bg-dark-300 rounded text-xs font-medium text-gray-600 dark:text-gray-400">
               VISA
@@ -554,7 +556,7 @@ const Payment = () => {
         >
           <div className="flex items-center gap-2 mb-4">
             <BookmarkIcon className="w-5 h-5 text-gray-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Méthodes enregistrées</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('saved_methods')}</h2>
           </div>
           <div className="space-y-3">
             {savedMethods.map(method => (
@@ -574,7 +576,7 @@ const Payment = () => {
                   }}
                   className="text-xs text-red-500 hover:text-red-600"
                 >
-                  Supprimer
+                  {t('remove')}
                 </button>
               </div>
             ))}
@@ -590,13 +592,13 @@ const Payment = () => {
         className="bg-white dark:bg-dark-200 rounded-lg border border-gray-200 dark:border-dark-100 overflow-hidden"
       >
         <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-100">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Historique des paiements</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('payment_history')}</h2>
         </div>
 
         {paymentHistory.length === 0 ? (
           <div className="p-8 text-center">
             <CreditCardIcon className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">Aucun paiement effectué</p>
+            <p className="text-gray-500 dark:text-gray-400">{t('no_payments')}</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-200 dark:divide-dark-100">
