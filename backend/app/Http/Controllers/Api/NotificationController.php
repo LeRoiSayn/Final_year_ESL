@@ -208,6 +208,98 @@ class NotificationController extends Controller
             ];
         }
 
+        // 7. New course materials (last 7 days)
+        $recentMaterials = \App\Models\CourseMaterial::with('course')
+            ->whereIn('course_id', $enrolledCourseIds)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        foreach ($recentMaterials as $material) {
+            $notifications[] = [
+                'id' => 'material_' . $material->id,
+                'type' => 'new_material',
+                'icon' => 'document',
+                'title' => 'Nouveau document partagé',
+                'message' => ($material->course?->name ?? 'Cours') . ' — ' . $material->title,
+                'priority' => 'medium',
+                'date' => $material->created_at->toIso8601String(),
+                'read' => false,
+            ];
+        }
+
+        // 8. Upcoming online course sessions (next 7 days)
+        $upcomingOnlineCourses = \App\Models\OnlineCourse::with('course')
+            ->whereIn('course_id', $enrolledCourseIds)
+            ->where('status', 'scheduled')
+            ->where('scheduled_at', '>=', now())
+            ->where('scheduled_at', '<=', now()->addDays(7))
+            ->orderBy('scheduled_at')
+            ->take(5)
+            ->get();
+
+        foreach ($upcomingOnlineCourses as $session) {
+            $daysLeft = now()->diffInDays($session->scheduled_at, false);
+            $notifications[] = [
+                'id' => 'online_' . $session->id,
+                'type' => 'online_session',
+                'icon' => 'video',
+                'title' => 'Cours en ligne programmé',
+                'message' => ($session->course?->name ?? 'Cours') . ' — ' . $session->title . ' le ' . ($session->scheduled_at instanceof \Carbon\Carbon ? $session->scheduled_at->format('d/m/Y à H:i') : $session->scheduled_at),
+                'priority' => $daysLeft <= 1 ? 'high' : 'medium',
+                'date' => ($session->scheduled_at instanceof \Carbon\Carbon ? $session->scheduled_at->toIso8601String() : $session->scheduled_at),
+                'read' => false,
+            ];
+        }
+
+        // 9. Recently published assignments (last 7 days, not yet in deadline window)
+        $newAssignments = \App\Models\Assignment::whereIn('course_id', $enrolledCourseIds)
+            ->where('status', 'published')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->where('due_date', '>', now()->addDays(7)) // avoid duplicating deadline notifications
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        foreach ($newAssignments as $assignment) {
+            $notifications[] = [
+                'id' => 'new_assignment_' . $assignment->id,
+                'type' => 'new_assignment',
+                'icon' => 'document',
+                'title' => 'Nouveau devoir publié',
+                'message' => $assignment->title . ' — à rendre le ' . (\Carbon\Carbon::parse($assignment->due_date)->format('d/m/Y')),
+                'priority' => 'medium',
+                'date' => $assignment->created_at->toIso8601String(),
+                'read' => false,
+            ];
+        }
+
+        // 10. Recently published quizzes (last 7 days, not yet in deadline window)
+        $newQuizzes = \App\Models\Quiz::whereIn('course_id', $enrolledCourseIds)
+            ->where('status', 'published')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->where(function ($q) {
+                $q->whereNull('available_until')
+                  ->orWhere('available_until', '>', now()->addDays(7));
+            })
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        foreach ($newQuizzes as $quiz) {
+            $notifications[] = [
+                'id' => 'new_quiz_' . $quiz->id,
+                'type' => 'new_quiz',
+                'icon' => 'academic',
+                'title' => 'Nouveau quiz disponible',
+                'message' => $quiz->title . ($quiz->available_until ? ' — disponible jusqu\'au ' . (\Carbon\Carbon::parse($quiz->available_until)->format('d/m/Y')) : ''),
+                'priority' => 'medium',
+                'date' => $quiz->created_at->toIso8601String(),
+                'read' => false,
+            ];
+        }
+
         return $notifications;
     }
 
@@ -305,6 +397,29 @@ class NotificationController extends Controller
             ];
         }
 
+        // 6. Grade validation/rejection notifications (persistent, from DB)
+        $gradeNotifications = \App\Models\Notification::where('user_id', $user->id)
+            ->whereIn('type', ['grades_validated', 'grades_rejected'])
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
+        foreach ($gradeNotifications as $notif) {
+            $notifications[] = [
+                'id'       => 'notif_' . $notif->id,
+                'type'     => $notif->type,
+                'icon'     => $notif->type === 'grades_validated' ? 'check' : 'exclamation',
+                'title'    => $notif->title,
+                'message'  => $notif->message,
+                'priority' => $notif->type === 'grades_rejected' ? 'high' : 'medium',
+                'date'     => $notif->created_at->toIso8601String(),
+                'read'     => $notif->read_at !== null,
+                'link'     => $notif->link,
+                'data'     => $notif->data,
+            ];
+        }
+
         return $notifications;
     }
 
@@ -388,6 +503,29 @@ class NotificationController extends Controller
                 'priority' => 'low',
                 'date' => now()->toIso8601String(),
                 'read' => false,
+            ];
+        }
+
+        // 6. Grade submissions from teachers (persistent, from DB)
+        $gradeSubmissions = \App\Models\Notification::where('user_id', $user->id)
+            ->where('type', 'grades_submitted')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
+        foreach ($gradeSubmissions as $notif) {
+            $notifications[] = [
+                'id'       => 'notif_' . $notif->id,
+                'type'     => 'grades_submitted',
+                'icon'     => 'academic',
+                'title'    => $notif->title,
+                'message'  => $notif->message,
+                'priority' => 'high',
+                'date'     => $notif->created_at->toIso8601String(),
+                'read'     => $notif->read_at !== null,
+                'link'     => '/admin/grades',
+                'data'     => $notif->data,
             ];
         }
 

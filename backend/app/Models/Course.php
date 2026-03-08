@@ -16,6 +16,7 @@ class Course extends Model
         'description',
         'credits',
         'level',
+        'semester',
         'hours_per_week',
         'is_active',
     ];

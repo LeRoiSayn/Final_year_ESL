@@ -37,6 +37,7 @@ const ELearning = () => {
   const [showModal, setShowModal] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [editingCourse, setEditingCourse] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -111,6 +112,35 @@ const ELearning = () => {
       if (activeTab === "materials") fetchMaterials(courseId);
       if (activeTab === "quizzes") fetchQuizzes(courseId);
       if (activeTab === "assignments") fetchAssignments(courseId);
+    }
+  };
+
+  const startCourse = async (id) => {
+    try {
+      const res = await api.post(`/elearning/courses/${id}/start`);
+      setOnlineCourses((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: "live" } : c))
+      );
+      if (res.data.meeting_url) {
+        window.open(res.data.meeting_url, "_blank", "noopener,noreferrer");
+      }
+      toast.success("Session démarrée !");
+    } catch (err) {
+      toast.error("Impossible de démarrer la session.");
+    }
+  };
+
+  const handleUpdateCourse = async (id, data) => {
+    try {
+      const res = await api.put(`/elearning/courses/${id}`, data);
+      const updated = res.data.course;
+      setOnlineCourses((prev) =>
+        prev.map((c) => (c.id === id ? updated : c))
+      );
+      setEditingCourse(null);
+      toast.success("Cours mis à jour.");
+    } catch (err) {
+      toast.error("Erreur lors de la mise à jour.");
     }
   };
 
@@ -333,6 +363,99 @@ const ELearning = () => {
     );
   };
 
+  const EditOnlineCourseModal = () => {
+    const [formData, setFormData] = useState({
+      title: editingCourse?.title ?? "",
+      description: editingCourse?.description ?? "",
+      meeting_url: editingCourse?.meeting_url ?? "",
+      scheduled_at: editingCourse?.scheduled_at
+        ? new Date(editingCourse.scheduled_at).toISOString().slice(0, 16)
+        : "",
+      duration_minutes: editingCourse?.duration_minutes ?? 60,
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      try {
+        await handleUpdateCourse(editingCourse.id, formData);
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    return (
+      <Modal title="Modifier le Cours en Ligne" onClose={() => setEditingCourse(null)}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Titre</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="input"
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="input"
+              rows={3}
+            />
+          </div>
+          <div>
+            <label className="label">Lien de réunion (URL)</label>
+            <input
+              type="url"
+              value={formData.meeting_url}
+              onChange={(e) => setFormData({ ...formData, meeting_url: e.target.value })}
+              className="input"
+              placeholder="https://meet.google.com/xxx-xxxx-xxx"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Date et heure</label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_at}
+                onChange={(e) => setFormData({ ...formData, scheduled_at: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Durée (min)</label>
+              <input
+                type="number"
+                min="15"
+                value={formData.duration_minutes}
+                onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
+                className="input"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setEditingCourse(null)}
+              className="btn-secondary flex-1"
+            >
+              Annuler
+            </button>
+            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
+              {isSubmitting ? "Enregistrement..." : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    );
+  };
+
+
   const UploadMaterialModal = () => {
     const fileInputRef = useRef(null);
     const [formData, setFormData] = useState({
@@ -388,7 +511,7 @@ const ELearning = () => {
       if (formData.class_id) data.append("class_id", formData.class_id);
       data.append("title", formData.title);
       data.append("description", formData.description);
-      data.append("downloadable", formData.downloadable);
+      data.append("downloadable", formData.downloadable ? 1 : 0);
 
       if (formData.mode === "link") {
         data.append("type", "link");
@@ -1529,7 +1652,7 @@ const ELearning = () => {
     </div>
   );
 
-  const CourseCard = ({ course }) => (
+  const CourseCard = ({ course, onStart, onEdit }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1578,16 +1701,22 @@ const ELearning = () => {
       </div>
       <div className="flex gap-2">
         {course.status === "scheduled" && (
-          <button className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600">
+          <button
+            onClick={() => onStart(course.id)}
+            className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600">
             Démarrer
           </button>
         )}
         {course.status === "live" && (
-          <button className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
+          <button
+            onClick={() => course.meeting_url && window.open(course.meeting_url, "_blank", "noopener,noreferrer")}
+            className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
             Rejoindre
           </button>
         )}
-        <button className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-lg">
+        <button
+          onClick={() => onEdit(course)}
+          className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-lg">
           <PencilIcon className="w-4 h-4" />
         </button>
       </div>
@@ -1846,7 +1975,12 @@ const ELearning = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {onlineCourses.map((course) => (
-                    <CourseCard key={course.id} course={course} />
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      onStart={startCourse}
+                      onEdit={setEditingCourse}
+                    />
                   ))}
                 </div>
               )}
@@ -1975,6 +2109,7 @@ const ELearning = () => {
           {showModal === "assignment-submissions" && (
             <AssignmentSubmissionsModal />
           )}
+          {editingCourse && <EditOnlineCourseModal />}
         </AnimatePresence>
       </div>
     </ErrorBoundary>

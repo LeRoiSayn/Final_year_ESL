@@ -12,6 +12,9 @@ use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\OnlineCourseAttendance;
 use App\Models\Enrollment;
+use App\Models\ClassModel;
+use App\Models\Notification;
+use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -209,6 +212,58 @@ class ELearningController extends Controller
         return response()->json(['message' => 'Déconnexion enregistrée']);
     }
 
+    /**
+     * Teacher starts (goes live) an online course session.
+     */
+    public function startOnlineCourse(Request $request, $id)
+    {
+        $teacher = $this->getTeacher($request);
+        $course  = OnlineCourse::findOrFail($id);
+
+        if ($course->teacher_id !== $teacher->id) {
+            return response()->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $course->update(['status' => 'live']);
+
+        return response()->json([
+            'message'     => 'Session démarrée',
+            'meeting_url' => $course->meeting_url,
+            'course'      => $course->fresh(),
+        ]);
+    }
+
+    /**
+     * Teacher updates an online course session.
+     */
+    public function updateOnlineCourse(Request $request, $id)
+    {
+        $teacher = $this->getTeacher($request);
+        $course  = OnlineCourse::findOrFail($id);
+
+        if ($course->teacher_id !== $teacher->id) {
+            return response()->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $request->validate([
+            'title'            => 'sometimes|string|max:255',
+            'description'      => 'nullable|string',
+            'meeting_url'      => 'nullable|url',
+            'scheduled_at'     => 'nullable|date',
+            'duration_minutes' => 'nullable|integer|min:1',
+        ]);
+
+        $course->update(array_filter([
+            'title'            => $request->title,
+            'description'      => $request->description,
+            'meeting_url'      => $request->meeting_url,
+            'scheduled_at'     => $request->scheduled_at,
+            'duration_minutes' => $request->duration_minutes,
+        ], fn($v) => !is_null($v)));
+
+        return response()->json(['course' => $course->fresh()]);
+    }
+
     // ==================== COURSE MATERIALS ====================
 
     /**
@@ -268,6 +323,26 @@ class ELearningController extends Controller
             'file_size' => $fileSize,
             'downloadable' => $request->downloadable ?? true,
         ]);
+
+        // Notify enrolled students about new material
+        $course = Course::find($request->course_id);
+        $teacherName = $teacher->user->first_name ?? 'Un professeur';
+        $enrolledUserIds = Enrollment::join('classes', 'enrollments.class_id', '=', 'classes.id')
+            ->join('students', 'enrollments.student_id', '=', 'students.id')
+            ->where('classes.course_id', $request->course_id)
+            ->where('enrollments.status', 'enrolled')
+            ->pluck('students.user_id');
+
+        foreach ($enrolledUserIds as $userId) {
+            Notification::notify(
+                $userId,
+                'new_material',
+                'Nouveau document partagé',
+                $teacherName . ' a partagé "' . $material->title . '" dans ' . ($course?->name ?? 'votre cours'),
+                '/student/elearning',
+                ['course_id' => $material->course_id, 'material_id' => $material->id]
+            );
+        }
 
         return response()->json([
             'message' => 'Document uploadé avec succès',
@@ -799,6 +874,26 @@ class ELearningController extends Controller
 
         $quiz->update(['status' => 'published']);
 
+        // Notify enrolled students
+        $course = Course::find($quiz->course_id);
+        $teacherName = $teacher->user->first_name ?? 'Un professeur';
+        $enrolledUserIds = Enrollment::join('classes', 'enrollments.class_id', '=', 'classes.id')
+            ->join('students', 'enrollments.student_id', '=', 'students.id')
+            ->where('classes.course_id', $quiz->course_id)
+            ->where('enrollments.status', 'enrolled')
+            ->pluck('students.user_id');
+
+        foreach ($enrolledUserIds as $userId) {
+            Notification::notify(
+                $userId,
+                'new_quiz',
+                'Nouveau quiz disponible',
+                $teacherName . ' a publié le quiz "' . $quiz->title . '" dans ' . ($course?->name ?? 'votre cours'),
+                '/student/elearning',
+                ['course_id' => $quiz->course_id, 'quiz_id' => $quiz->id]
+            );
+        }
+
         return response()->json([
             'message' => 'Quiz publié avec succès',
             'quiz' => $quiz,
@@ -818,6 +913,26 @@ class ELearningController extends Controller
         }
 
         $assignment->update(['status' => 'published']);
+
+        // Notify enrolled students
+        $course = Course::find($assignment->course_id);
+        $teacherName = $teacher->user->first_name ?? 'Un professeur';
+        $enrolledUserIds = Enrollment::join('classes', 'enrollments.class_id', '=', 'classes.id')
+            ->join('students', 'enrollments.student_id', '=', 'students.id')
+            ->where('classes.course_id', $assignment->course_id)
+            ->where('enrollments.status', 'enrolled')
+            ->pluck('students.user_id');
+
+        foreach ($enrolledUserIds as $userId) {
+            Notification::notify(
+                $userId,
+                'new_assignment',
+                'Nouveau devoir publié',
+                $teacherName . ' a publié le devoir "' . $assignment->title . '" dans ' . ($course?->name ?? 'votre cours'),
+                '/student/elearning',
+                ['course_id' => $assignment->course_id, 'assignment_id' => $assignment->id]
+            );
+        }
 
         return response()->json([
             'message' => 'Devoir publié avec succès',

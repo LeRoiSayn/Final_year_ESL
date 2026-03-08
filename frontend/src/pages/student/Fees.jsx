@@ -8,8 +8,10 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  ExclamationTriangleIcon,
   CalendarIcon,
 } from '@heroicons/react/24/outline'
+import { Link } from 'react-router-dom'
 
 export default function StudentFees() {
   const { user } = useAuth()
@@ -52,6 +54,12 @@ export default function StudentFees() {
     )
   }
 
+  const balance = (data.summary?.balance || 0)
+  const isPaid = balance <= 0
+  const totalFees = data.summary?.total || 0
+  const paidAmount = data.summary?.paid || 0
+  const paymentPercent = totalFees > 0 ? Math.round((paidAmount / totalFees) * 100) : 100
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
@@ -60,6 +68,55 @@ export default function StudentFees() {
         <p className="text-gray-500 dark:text-gray-400 mt-1">
           Année académique {new Date().getFullYear()} - {new Date().getFullYear() + 1}
         </p>
+      </motion.div>
+
+      {/* Payment Status Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`rounded-xl p-4 flex items-center gap-4 ${
+          isPaid
+            ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700'
+        }`}
+      >
+        <div className={`p-3 rounded-full ${isPaid ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
+          {isPaid ? (
+            <CheckCircleIcon className="w-7 h-7 text-green-600 dark:text-green-400" />
+          ) : (
+            <ExclamationTriangleIcon className="w-7 h-7 text-red-600 dark:text-red-400" />
+          )}
+        </div>
+        <div className="flex-1">
+          <h3 className={`font-semibold text-lg ${isPaid ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+            {isPaid ? 'Compte en règle' : 'Paiement en attente'}
+          </h3>
+          <p className={`text-sm ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {isPaid
+              ? 'Tous vos frais de scolarité sont à jour.'
+              : `Solde restant : ${formatCurrency(balance)} — Veuillez régulariser votre situation.`
+            }
+          </p>
+          {!isPaid && totalFees > 0 && (
+            <div className="mt-2">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-red-500 dark:text-red-400">{paymentPercent}% payé</span>
+                <span className="text-red-500 dark:text-red-400">{formatCurrency(paidAmount)} / {formatCurrency(totalFees)}</span>
+              </div>
+              <div className="h-2 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
+                <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${paymentPercent}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+        {!isPaid && (
+          <Link
+            to="/student/payment"
+            className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
+          >
+            Payer maintenant
+          </Link>
+        )}
       </motion.div>
 
       {/* Tuition Overview - Simple and Clean */}

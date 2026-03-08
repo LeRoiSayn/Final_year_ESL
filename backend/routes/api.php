@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('grades', GradeController::class);
     Route::get('/grades/class/{classId}', [GradeController::class, 'byClass']);
     Route::post('/grades/bulk', [GradeController::class, 'bulkUpdate']);
+    Route::post('/grades/submit-class/{classId}', [GradeController::class, 'submitToAdmin']);
 
     // Attendance
     Route::apiResource('attendance', AttendanceController::class);
@@ -144,6 +145,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/courses', [ELearningController::class, 'createOnlineCourse']);
         Route::post('/courses/{id}/join', [ELearningController::class, 'joinOnlineCourse']);
         Route::post('/courses/{id}/leave', [ELearningController::class, 'leaveOnlineCourse']);
+        Route::post('/courses/{id}/start', [ELearningController::class, 'startOnlineCourse']);
+        Route::put('/courses/{id}', [ELearningController::class, 'updateOnlineCourse']);
 
         // Course Materials
         Route::post('/materials', [ELearningController::class, 'uploadMaterial']);
@@ -179,6 +182,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/students/{id}/details', [AdminController::class, 'getStudentDetails']);
         
         // Grade Management
+        Route::get('/grades/overview', [GradeController::class, 'adminOverview']);
+        Route::post('/grades/validate-class/{classId}', [GradeController::class, 'validateClass']);
+        Route::post('/grades/reject-class/{classId}', [GradeController::class, 'rejectClass']);
         Route::put('/grades/{gradeId}', [AdminController::class, 'updateGrade']);
         Route::get('/grades/{gradeId}/history', [AdminController::class, 'getGradeHistory']);
         

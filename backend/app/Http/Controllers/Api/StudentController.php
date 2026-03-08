@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Course;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
+use App\Models\Teacher;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -194,23 +195,40 @@ class StudentController extends Controller
 
     private function autoEnrollStudent(Student $student): int
     {
-        // Get courses for student's department and level
+        // Determine current academic semester (3 semesters per year)
+        // Semester 1: Sep-Dec, Semester 2: Jan-Apr, Semester 3: May-Aug
+        $month = (int) date('n');
+        if ($month >= 9 && $month <= 12) {
+            $currentSemester = '1';
+        } elseif ($month >= 1 && $month <= 4) {
+            $currentSemester = '2';
+        } else {
+            $currentSemester = '3';
+        }
+
+        $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
+
+        // Get courses for student's department, level AND current semester
         $courses = Course::where('department_id', $student->department_id)
             ->where('level', $student->level)
+            ->where('semester', $currentSemester)
             ->where('is_active', true)
             ->get();
 
         $enrolledCount = 0;
-        $academicYear = date('Y') . '-' . (date('Y') + 1);
-        $semester = date('n') <= 6 ? '2' : '1';
+
+        // Get available teachers from the same department for auto-assignment
+        $departmentTeachers = Teacher::where('department_id', $student->department_id)
+            ->where('status', 'active')
+            ->get();
 
         foreach ($courses as $course) {
-            // Find or create class
+            // Find or create class for this course in current semester
             $class = ClassModel::firstOrCreate(
                 [
                     'course_id' => $course->id,
                     'academic_year' => $academicYear,
-                    'semester' => $semester,
+                    'semester' => $currentSemester,
                     'section' => 'A',
                 ],
                 [
@@ -219,6 +237,16 @@ class StudentController extends Controller
                     'is_active' => true,
                 ]
             );
+
+            // Auto-assign a teacher if the class has none and teachers are available
+            if (!$class->teacher_id && $departmentTeachers->isNotEmpty()) {
+                // Pick the teacher with the fewest classes (load balancing)
+                $teacher = $departmentTeachers->sortBy(function ($t) {
+                    return ClassModel::where('teacher_id', $t->id)->count();
+                })->first();
+
+                $class->update(['teacher_id' => $teacher->id]);
+            }
 
             // Check if already enrolled
             $existingEnrollment = Enrollment::where('student_id', $student->id)
@@ -241,6 +269,9 @@ class StudentController extends Controller
 
     public function autoEnrollAll()
     {
+        // First, fix any existing classes without a teacher assigned
+        $this->assignTeachersToOrphanedClasses();
+
         $students = Student::where('status', 'active')->get();
         $totalEnrolled = 0;
 
@@ -254,6 +285,32 @@ class StudentController extends Controller
             'students_processed' => $students->count(),
             'total_enrollments' => $totalEnrolled,
         ], 'Auto-enrollment completed');
+    }
+
+    /**
+     * Assign teachers to classes that have no teacher_id.
+     * Picks a teacher from the same department with the fewest classes.
+     */
+    private function assignTeachersToOrphanedClasses(): void
+    {
+        $orphanedClasses = ClassModel::whereNull('teacher_id')
+            ->with('course')
+            ->get();
+
+        foreach ($orphanedClasses as $class) {
+            $departmentId = $class->course->department_id ?? null;
+            if (!$departmentId) continue;
+
+            $teacher = Teacher::where('department_id', $departmentId)
+                ->where('status', 'active')
+                ->withCount('classes')
+                ->orderBy('classes_count', 'asc')
+                ->first();
+
+            if ($teacher) {
+                $class->update(['teacher_id' => $teacher->id]);
+            }
+        }
     }
 
     public function courses(Student $student)
@@ -409,15 +466,16 @@ class StudentController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find or create a class for this course
-            $academicYear = date('Y') . '-' . (date('Y') + 1);
-            $semester = date('n') <= 6 ? '2' : '1';
+            // Find or create a class for this course using its defined semester
+            $month = (int) date('n');
+            $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
+            $courseSemester = $course->semester ?? '1';
 
             $class = ClassModel::firstOrCreate(
                 [
                     'course_id' => $course->id,
                     'academic_year' => $academicYear,
-                    'semester' => $semester,
+                    'semester' => $courseSemester,
                     'section' => 'A',
                 ],
                 [
@@ -515,8 +573,8 @@ class StudentController extends Controller
             'course_ids.*' => 'exists:courses,id',
         ]);
 
-        $academicYear = date('Y') . '-' . (date('Y') + 1);
-        $semester = date('n') <= 6 ? '2' : '1';
+        $month = (int) date('n');
+        $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
         $assignedCourses = [];
         $skippedCourses = [];
 
@@ -536,12 +594,14 @@ class StudentController extends Controller
                     continue;
                 }
 
+                $courseSemester = $course->semester ?? '1';
+
                 // Find or create class
                 $class = ClassModel::firstOrCreate(
                     [
                         'course_id' => $courseId,
                         'academic_year' => $academicYear,
-                        'semester' => $semester,
+                        'semester' => $courseSemester,
                         'section' => 'A',
                     ],
                     [

@@ -111,7 +111,7 @@ const StudentManagement = () => {
   }
 
   const GradeModificationModal = ({ grade, onClose }) => {
-    const [newGrade, setNewGrade] = useState(grade.grade)
+    const [newGrade, setNewGrade] = useState(grade.final_grade)
     const [reason, setReason] = useState('')
 
     return (
@@ -144,7 +144,7 @@ const StudentManagement = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Note actuelle
               </label>
-              <p className="text-2xl font-bold text-primary-600">{grade.grade}/20</p>
+              <p className="text-2xl font-bold text-primary-600">{grade.final_grade}/100 ({grade.letter_grade})</p>
             </div>
 
             <div>
@@ -156,7 +156,7 @@ const StudentManagement = () => {
                 value={newGrade}
                 onChange={(e) => setNewGrade(parseFloat(e.target.value))}
                 min={0}
-                max={20}
+                max={100}
                 step={0.5}
                 className="w-full p-3 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white text-xl font-bold"
               />
@@ -309,7 +309,7 @@ const StudentManagement = () => {
                         {student.user?.first_name} {student.user?.last_name}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {student.registration_number}
+                        {student.student_id}
                       </p>
                     </div>
                     <span className={`px-2 py-1 text-xs rounded-full ${
@@ -351,7 +351,7 @@ const StudentManagement = () => {
                           {selectedStudent.student.user?.first_name} {selectedStudent.student.user?.last_name}
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400">
-                          {selectedStudent.student.registration_number}
+                          {selectedStudent.student.student_id}
                         </p>
                         <p className="text-sm text-gray-400">
                           {selectedStudent.student.department?.name} • {selectedStudent.student.level}
@@ -429,9 +429,9 @@ const StudentManagement = () => {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={`text-xl font-bold ${
-                            grade.grade >= 10 ? 'text-green-600' : 'text-red-600'
+                            grade.final_grade >= 50 ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {grade.grade}/20
+                            {grade.final_grade}/100 ({grade.letter_grade})
                           </span>
                           <button
                             onClick={() => setShowGradeModal(grade)}

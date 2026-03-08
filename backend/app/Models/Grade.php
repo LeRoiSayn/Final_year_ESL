@@ -11,6 +11,8 @@ class Grade extends Model
 
     protected $fillable = [
         'enrollment_id',
+        'attendance_score',
+        'quiz_score',
         'continuous_assessment',
         'exam_score',
         'final_grade',
@@ -21,10 +23,12 @@ class Grade extends Model
     ];
 
     protected $casts = [
+        'attendance_score'     => 'decimal:2',
+        'quiz_score'           => 'decimal:2',
         'continuous_assessment' => 'decimal:2',
-        'exam_score' => 'decimal:2',
-        'final_grade' => 'decimal:2',
-        'graded_at' => 'datetime',
+        'exam_score'           => 'decimal:2',
+        'final_grade'          => 'decimal:2',
+        'graded_at'            => 'datetime',
     ];
 
     public function enrollment()
@@ -53,10 +57,21 @@ class Grade extends Model
         return 'F';
     }
 
-    public static function calculateFinalGrade(float $ca, float $exam): float
-    {
-        // 40% Continuous Assessment + 60% Exam
-        return round(($ca * 0.4) + ($exam * 0.6), 2);
+    /**
+     * Calculate final grade from 4 components:
+     *   Attendance  max 10 pts
+     *   Quiz        max 20 pts
+     *   CA (CC)     max 30 pts
+     *   Final exam  max 40 pts
+     *   Total max = 100
+     */
+    public static function calculateFinalGrade(
+        float $ca,
+        float $exam,
+        float $quiz = 0,
+        float $attendance = 0
+    ): float {
+        return round($attendance + $quiz + $ca + $exam, 2);
     }
 
     public function isPassing(): bool

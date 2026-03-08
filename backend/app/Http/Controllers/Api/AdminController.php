@@ -26,13 +26,13 @@ class AdminController extends Controller
     {
         $query = Student::with(['user', 'department.faculty']);
 
-        // Search by name, email, or registration number
-        if ($request->has('search')) {
+        // Search by name, email, or student_id
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('registration_number', 'like', "%{$search}%")
-                    ->orWhereHas('user', function ($q) use ($search) {
-                        $q->where('first_name', 'like', "%{$search}%")
+                $q->where('student_id', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search) {
+                        $uq->where('first_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
                     });
@@ -40,86 +40,255 @@ class AdminController extends Controller
         }
 
         // Filter by department
-        if ($request->has('department_id')) {
+        if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
 
         // Filter by level
-        if ($request->has('level')) {
+        if ($request->filled('level')) {
             $query->where('level', $request->level);
         }
 
         // Filter by status
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by enrollment year
-        if ($request->has('enrollment_year')) {
-            $query->whereYear('created_at', $request->enrollment_year);
-        }
-
-        // Filter by financial status
-        if ($request->has('financial_status')) {
-            if ($request->financial_status === 'paid') {
-                $query->whereDoesntHave('fees', function ($q) {
-                    $q->whereRaw('amount > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.student_id = student_fees.student_id AND status = "completed")');
-                });
-            } elseif ($request->financial_status === 'unpaid') {
-                $query->whereHas('fees', function ($q) {
-                    $q->whereRaw('amount > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.student_id = student_fees.student_id AND status = "completed")');
-                });
-            }
-        }
-
-        $students = $query->paginate($request->per_page ?? 20);
+        $students = $query->orderBy('created_at', 'desc')->paginate($request->per_page ?? 20);
 
         return response()->json($students);
     }
 
     /**
-     * Get detailed student information
+     * Get detailed student information with a full academic transcript view.
+     *
+     * Returns courses organised by Year (level) → Semester → Course, so the
+     * admin sees exactly what the student did each semester, what was validated,
+     * what is in progress right now, and what is still to come.
      */
     public function getStudentDetails($id)
     {
         $student = Student::with([
             'user',
             'department.faculty',
-            'enrollments.course',
-            'grades.course',
-            'grades.modifications.modifier',
+            'enrollments.class.course',
+            'enrollments.class.teacher.user',
+            'enrollments.grades',
+            'enrollments.attendance',
             'fees',
-            'payments',
-            'attendance',
-            'equivalences.equivalentCourse',
         ])->findOrFail($id);
 
-        // Calculate statistics
-        $grades = $student->grades;
-        $gradesBySemester = $grades->groupBy('semester')->map(function ($semesterGrades) {
-            return [
-                'average' => round($semesterGrades->avg('grade'), 2),
-                'count' => $semesterGrades->count(),
+        // Determine current academic period
+        $month = (int) date('n');
+        $currentCalendarSemester = $month >= 9 ? '1' : ($month <= 4 ? '2' : '3');
+
+        // Full programme: all active courses for the student's department
+        $allProgrammeCourses = Course::where('department_id', $student->department_id)
+            ->where('is_active', true)
+            ->orderByRaw("FIELD(level, 'L1','L2','L3','M1','M2','D1','D2','D3')")
+            ->orderBy('semester')
+            ->orderBy('name')
+            ->get();
+
+        // Build a lookup: course_id → enrollment (with its latest grade)
+        $enrolledCourseMap = [];
+        foreach ($student->enrollments as $enrollment) {
+            $courseId = $enrollment->class->course_id ?? null;
+            if ($courseId) {
+                $enrollment->latest_grade = $enrollment->grades->sortByDesc('created_at')->first();
+                $enrolledCourseMap[$courseId] = $enrollment;
+            }
+        }
+
+        // Level (year) labels
+        $levelLabels = [
+            'L1' => '1ère Année', 'L2' => '2ème Année', 'L3' => '3ème Année',
+            'M1' => 'Master 1',   'M2' => 'Master 2',
+            'D1' => 'Doctorat 1', 'D2' => 'Doctorat 2', 'D3' => 'Doctorat 3',
+        ];
+
+        // Level ordering so we can determine "is future year"
+        $levelOrder = ['L1' => 1, 'L2' => 2, 'L3' => 3, 'M1' => 4, 'M2' => 5, 'D1' => 6, 'D2' => 7, 'D3' => 8];
+        $studentLevelOrder = $levelOrder[$student->level] ?? 1;
+
+        $totalCreditsEarned = 0;
+        $totalCreditsTotal  = $allProgrammeCourses->sum('credits');
+
+        $years = [];
+
+        foreach ($allProgrammeCourses->groupBy('level') as $level => $levelCourses) {
+            $thisLevelOrder = $levelOrder[$level] ?? 1;
+            $isCurrentYear  = ($level === $student->level);
+            $isPastYear     = ($thisLevelOrder < $studentLevelOrder);
+            $isFutureYear   = ($thisLevelOrder > $studentLevelOrder);
+
+            $semesters = [];
+            $yearCreditsEarned = 0;
+            $yearCreditsTotal  = 0;
+            $yearValidated = 0;
+            $yearInProgress = 0;
+            $yearFailed = 0;
+
+            foreach ($levelCourses->groupBy('semester') as $semester => $semesterCourses) {
+                $courses        = [];
+                $semCreditsEarned = 0;
+                $semCreditsTotal  = 0;
+                $semValidated   = 0;
+                $semInProgress  = 0;
+                $semFailed      = 0;
+                $semNotEnrolled = 0;
+
+                foreach ($semesterCourses as $course) {
+                    $semCreditsTotal += $course->credits;
+
+                    if (isset($enrolledCourseMap[$course->id])) {
+                        $enrollment = $enrolledCourseMap[$course->id];
+                        $grade      = $enrollment->latest_grade;
+                        $finalGrade = $grade ? (float) $grade->final_grade : null;
+
+                        // A course is "validated" if its enrollment is completed with passing grade,
+                        // OR if it has a grade >= 50 (teacher has graded it, regardless of enrollment status).
+                        if ($finalGrade !== null && $finalGrade >= 50) {
+                            $courseStatus = 'validated';
+                            $semValidated++;
+                            $semCreditsEarned += $course->credits;
+                        } elseif ($finalGrade !== null && $finalGrade < 50) {
+                            $courseStatus = 'failed';
+                            $semFailed++;
+                        } else {
+                            $courseStatus = 'enrolled'; // In progress, not yet graded
+                            $semInProgress++;
+                        }
+                    } else {
+                        $courseStatus   = 'not_enrolled';
+                        $semNotEnrolled++;
+                        $grade          = null;
+                        $enrollment     = null;
+                    }
+
+                    $courses[] = [
+                        'course'        => $course,
+                        'course_status' => $courseStatus,
+                        'enrollment'    => $enrollment ? [
+                            'id'             => $enrollment->id,
+                            'status'         => $enrollment->status,
+                            'enrollment_date'=> $enrollment->enrollment_date,
+                            'teacher'        => $enrollment->class->teacher ? [
+                                'id'         => $enrollment->class->teacher->id,
+                                'first_name' => $enrollment->class->teacher->user->first_name ?? '',
+                                'last_name'  => $enrollment->class->teacher->user->last_name  ?? '',
+                            ] : null,
+                        ] : null,
+                        'grade'         => $grade ? [
+                            'id'                    => $grade->id,
+                            'continuous_assessment' => $grade->continuous_assessment,
+                            'exam_score'            => $grade->exam_score,
+                            'final_grade'           => $grade->final_grade,
+                            'letter_grade'          => $grade->letter_grade,
+                            'remarks'               => $grade->remarks,
+                            'graded_at'             => $grade->graded_at,
+                        ] : null,
+                    ];
+                }
+
+                // Semester status: past (all done), current (some in progress), future (none touched)
+                if ($semInProgress > 0) {
+                    $semStatus = 'current';
+                } elseif ($semValidated > 0 || $semFailed > 0) {
+                    $semStatus = 'past';
+                } elseif ($isCurrentYear && $semester === $currentCalendarSemester) {
+                    $semStatus = 'current';
+                } elseif ($isPastYear || ($isCurrentYear && (int)$semester < (int)$currentCalendarSemester)) {
+                    $semStatus = 'past';
+                } else {
+                    $semStatus = 'future';
+                }
+
+                $yearCreditsEarned += $semCreditsEarned;
+                $yearCreditsTotal  += $semCreditsTotal;
+                $yearValidated     += $semValidated;
+                $yearInProgress    += $semInProgress;
+                $yearFailed        += $semFailed;
+
+                $semesters[] = [
+                    'semester'      => $semester,
+                    'label'         => "Semestre {$semester}",
+                    'status'        => $semStatus,
+                    'courses'       => $courses,
+                    'stats'         => [
+                        'total'         => count($courses),
+                        'validated'     => $semValidated,
+                        'in_progress'   => $semInProgress,
+                        'failed'        => $semFailed,
+                        'not_enrolled'  => $semNotEnrolled,
+                        'credits_earned'=> $semCreditsEarned,
+                        'credits_total' => $semCreditsTotal,
+                    ],
+                ];
+            }
+
+            $totalCreditsEarned += $yearCreditsEarned;
+
+            $years[] = [
+                'year'            => $level,
+                'year_label'      => $levelLabels[$level] ?? $level,
+                'is_current_year' => $isCurrentYear,
+                'is_past_year'    => $isPastYear,
+                'is_future_year'  => $isFutureYear,
+                'semesters'       => $semesters,
+                'year_stats'      => [
+                    'total'          => $levelCourses->count(),
+                    'validated'      => $yearValidated,
+                    'in_progress'    => $yearInProgress,
+                    'failed'         => $yearFailed,
+                    'credits_earned' => $yearCreditsEarned,
+                    'credits_total'  => $yearCreditsTotal,
+                    'is_year_passed' => ($yearValidated + $yearFailed >= $levelCourses->count()) && $yearInProgress === 0,
+                ],
             ];
+        }
+
+        // Global statistics
+        $allGrades = $student->enrollments->flatMap(function ($enrollment) {
+            return $enrollment->grades->map(function ($grade) use ($enrollment) {
+                $grade->course = $enrollment->class->course ?? null;
+                return $grade;
+            });
         });
 
+        $allAttendance     = $student->enrollments->flatMap->attendance;
+        $totalAttendance   = $allAttendance->count();
+        $presentCount      = $allAttendance->whereIn('status', ['present', 'late'])->count();
+        $attendanceRate    = $totalAttendance > 0 ? round(($presentCount / $totalAttendance) * 100, 1) : 100;
+
         $totalFees = $student->fees->sum('amount');
-        $totalPaid = $student->payments->where('status', 'completed')->sum('amount');
-        
-        $totalAttendance = $student->attendance->count();
-        $presentCount = $student->attendance->where('status', 'present')->count();
-        $attendanceRate = $totalAttendance > 0 ? round(($presentCount / $totalAttendance) * 100, 1) : 100;
+        $totalPaid = $student->fees->sum('paid_amount');
+
+        $gradedGrades  = $allGrades->filter(fn($g) => $g->final_grade !== null);
+        $overallAverage = $gradedGrades->count() > 0 ? round($gradedGrades->avg('final_grade'), 2) : null;
 
         return response()->json([
             'student' => $student,
+            'academic_progress' => [
+                'current_level'     => $student->level,
+                'current_semester'  => $currentCalendarSemester,
+                'years'             => $years,
+                'programme_summary' => [
+                    'total_programme_courses' => $allProgrammeCourses->count(),
+                    'credits_earned'          => $totalCreditsEarned,
+                    'credits_total'           => $totalCreditsTotal,
+                    'completion_percentage'   => $totalCreditsTotal > 0
+                        ? round(($totalCreditsEarned / $totalCreditsTotal) * 100, 1)
+                        : 0,
+                ],
+            ],
             'statistics' => [
-                'overall_average' => round($grades->avg('grade') ?? 0, 2),
-                'grades_by_semester' => $gradesBySemester,
-                'total_credits' => $student->enrollments->sum(fn($e) => $e->course->credits ?? 0),
-                'financial' => [
+                'overall_average' => $overallAverage,
+                'total_credits'   => $totalCreditsEarned,
+                'financial'       => [
                     'total_fees' => $totalFees,
-                    'paid' => $totalPaid,
-                    'remaining' => $totalFees - $totalPaid,
+                    'paid'       => $totalPaid,
+                    'remaining'  => $totalFees - $totalPaid,
                 ],
                 'attendance_rate' => $attendanceRate,
             ],
@@ -134,12 +303,12 @@ class AdminController extends Controller
     public function updateGrade(Request $request, $gradeId)
     {
         $request->validate([
-            'grade' => 'required|numeric|min:0|max:20',
+            'grade' => 'required|numeric|min:0|max:100',
             'reason' => 'required|string|min:10|max:500',
         ]);
 
         $grade = Grade::findOrFail($gradeId);
-        $oldValue = $grade->grade;
+        $oldValue = $grade->final_grade;
         $newValue = $request->grade;
 
         // Don't update if same value
@@ -159,13 +328,14 @@ class AdminController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        // Update grade
-        $grade->grade = $newValue;
+        // Update grade using the same formula as Grade model
+        $grade->final_grade = $newValue;
+        $grade->letter_grade = Grade::calculateLetterGrade((float) $newValue);
         $grade->save();
 
         return response()->json([
             'message' => 'Note mise à jour avec succès',
-            'grade' => $grade->load('modifications.modifier'),
+            'grade' => $grade,
         ]);
     }
 
@@ -189,7 +359,7 @@ class AdminController extends Controller
      */
     public function getStudentCourses($studentId)
     {
-        $enrollments = Enrollment::with('course')
+        $enrollments = Enrollment::with('class.course')
             ->where('student_id', $studentId)
             ->get();
 
@@ -210,12 +380,31 @@ class AdminController extends Controller
     {
         $request->validate([
             'course_id' => 'required|exists:courses,id',
-            'notes' => 'nullable|string',
         ]);
 
-        // Check if already enrolled
+        $month = (int) date('n');
+        $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
+        $course = Course::findOrFail($request->course_id);
+        $courseSemester = $course->semester ?? '1';
+
+        // Find or create a class for this course
+        $class = \App\Models\ClassModel::firstOrCreate(
+            [
+                'course_id' => $request->course_id,
+                'academic_year' => $academicYear,
+                'semester' => $courseSemester,
+                'section' => 'A',
+            ],
+            [
+                'room' => 'TBD',
+                'capacity' => 50,
+                'is_active' => true,
+            ]
+        );
+
+        // Check if already enrolled in this class
         $exists = Enrollment::where('student_id', $studentId)
-            ->where('course_id', $request->course_id)
+            ->where('class_id', $class->id)
             ->exists();
 
         if ($exists) {
@@ -226,14 +415,14 @@ class AdminController extends Controller
 
         $enrollment = Enrollment::create([
             'student_id' => $studentId,
-            'course_id' => $request->course_id,
+            'class_id' => $class->id,
             'enrollment_date' => now(),
-            'status' => 'active',
+            'status' => 'enrolled',
         ]);
 
         return response()->json([
             'message' => 'Cours ajouté avec succès',
-            'enrollment' => $enrollment->load('course'),
+            'enrollment' => $enrollment->load('class.course'),
         ], 201);
     }
 
@@ -242,8 +431,11 @@ class AdminController extends Controller
      */
     public function removeStudentCourse(Request $request, $studentId, $courseId)
     {
+        // Find enrollment through class → course
         $enrollment = Enrollment::where('student_id', $studentId)
-            ->where('course_id', $courseId)
+            ->whereHas('class', function ($q) use ($courseId) {
+                $q->where('course_id', $courseId);
+            })
             ->firstOrFail();
 
         $enrollment->delete();
@@ -350,8 +542,8 @@ class AdminController extends Controller
         $pendingPayments = Payment::where('status', 'pending')->sum('amount');
 
         // Academic KPIs
-        $averageGrade = Grade::avg('grade');
-        $passRate = Grade::where('grade', '>=', 10)->count() / max(Grade::count(), 1) * 100;
+        $averageGrade = Grade::avg('final_grade');
+        $passRate = Grade::where('final_grade', '>=', 50)->count() / max(Grade::count(), 1) * 100;
 
         // Enrollment trends (last 5 years)
         $enrollmentTrends = Student::selectRaw('YEAR(created_at) as year, COUNT(*) as count')
@@ -362,17 +554,19 @@ class AdminController extends Controller
 
         // Department statistics
         $departmentStats = Department::withCount('students')
-            ->with(['students.grades'])
+            ->with(['students.enrollments.grades'])
             ->get()
             ->map(function ($dept) {
-                $grades = $dept->students->flatMap->grades;
+                $grades = $dept->students->flatMap(function ($student) {
+                    return $student->enrollments->flatMap->grades;
+                });
                 return [
                     'id' => $dept->id,
                     'name' => $dept->name,
                     'student_count' => $dept->students_count,
-                    'average_grade' => round($grades->avg('grade') ?? 0, 2),
-                    'pass_rate' => $grades->count() > 0 
-                        ? round($grades->where('grade', '>=', 10)->count() / $grades->count() * 100, 1)
+                    'average_grade' => round($grades->avg('final_grade') ?? 0, 2),
+                    'pass_rate' => $grades->count() > 0
+                        ? round($grades->where('final_grade', '>=', 50)->count() / $grades->count() * 100, 1)
                         : 0,
                 ];
             });
@@ -407,44 +601,46 @@ class AdminController extends Controller
      */
     public function getStudentAlerts()
     {
-        // Students with payment delays
-        $paymentDelays = Student::with(['user', 'fees', 'payments'])
-            ->whereHas('fees', function ($q) {
-                $q->whereRaw('amount > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.student_id = student_fees.student_id AND status = "completed")');
-            })
+        // Students with outstanding fees
+        $paymentDelays = Student::with(['user', 'fees'])
+            ->whereHas('fees')
             ->limit(20)
             ->get()
             ->map(function ($student) {
-                $owed = $student->fees->sum('amount') - $student->payments->where('status', 'completed')->sum('amount');
+                $totalFees = $student->fees->sum('amount');
+                $totalPaid = $student->fees->sum('paid_amount');
+                $owed = $totalFees - $totalPaid;
                 return [
                     'student' => [
                         'id' => $student->id,
                         'name' => $student->user->first_name . ' ' . $student->user->last_name,
-                        'registration_number' => $student->registration_number,
+                        'student_id' => $student->student_id,
                     ],
                     'amount_owed' => $owed,
                     'type' => 'payment_delay',
                 ];
-            });
-
-        // Students with low grades
-        $lowGrades = Student::with(['user', 'grades'])
-            ->get()
-            ->filter(function ($student) {
-                $avg = $student->grades->avg('grade');
-                return $avg !== null && $avg < 10;
             })
+            ->filter(fn($item) => $item['amount_owed'] > 0)
+            ->values();
+
+        // Students with low grades (through enrollments)
+        $lowGrades = Student::with(['user', 'enrollments.grades'])
+            ->whereHas('enrollments.grades')
+            ->get()
             ->map(function ($student) {
+                $grades = $student->enrollments->flatMap->grades;
+                $avg = $grades->avg('final_grade');
                 return [
                     'student' => [
                         'id' => $student->id,
                         'name' => $student->user->first_name . ' ' . $student->user->last_name,
-                        'registration_number' => $student->registration_number,
+                        'student_id' => $student->student_id,
                     ],
-                    'average' => round($student->grades->avg('grade'), 2),
+                    'average' => round($avg ?? 0, 2),
                     'type' => 'low_grades',
                 ];
             })
+            ->filter(fn($item) => $item['average'] > 0 && $item['average'] < 50)
             ->values()
             ->take(20);
 

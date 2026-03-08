@@ -129,6 +129,7 @@ export const gradeApi = {
   update: (id, data) => api.put(`/grades/${id}`, data),
   delete: (id) => api.delete(`/grades/${id}`),
   bulkUpdate: (grades) => api.post("/grades/bulk", { grades }),
+  submitToAdmin: (classId) => api.post(`/grades/submit-class/${classId}`),
 };
 
 // Attendance APIs
@@ -214,6 +215,18 @@ export const activityLogApi = {
 export const chatbotApi = {
   send: (message) => api.post("/chatbot", { message }),
   getHistory: () => api.get("/chatbot/history"),
+};
+
+// Admin APIs
+export const adminApi = {
+  searchStudents: (params) => api.get("/admin/students/search", { params }),
+  getStudentDetails: (id) => api.get(`/admin/students/${id}/details`),
+  updateGrade: (gradeId, data) => api.put(`/admin/grades/${gradeId}`, data),
+  getGradeHistory: (gradeId) => api.get(`/admin/grades/${gradeId}/history`),
+  validateClassGrades: (classId) => api.post(`/admin/grades/validate-class/${classId}`),
+  rejectClassGrades: (classId, reason) => api.post(`/admin/grades/reject-class/${classId}`, { reason }),
+  addStudentCourse: (studentId, data) => api.post(`/admin/students/${studentId}/courses`, data),
+  removeStudentCourse: (studentId, courseId) => api.delete(`/admin/students/${studentId}/courses/${courseId}`),
 };
 
 // Notification API

@@ -45,6 +45,7 @@ const menuItems = {
     { nameKey: 'menu_auto_enrollment', path: '/admin/enrollment', icon: CheckCircleIcon },
     { nameKey: 'menu_schedules', path: '/admin/schedules', icon: CalendarIcon },
     { nameKey: 'menu_reports', path: '/admin/reports', icon: ChartBarIcon },
+    { nameKey: 'menu_grades', path: '/admin/grades', icon: AcademicCapIcon },
     { nameKey: 'menu_activity_log', path: '/admin/activity-log', icon: ClockIcon },
     { nameKey: 'menu_settings', path: '/admin/settings', icon: Cog6ToothIcon },
   ],

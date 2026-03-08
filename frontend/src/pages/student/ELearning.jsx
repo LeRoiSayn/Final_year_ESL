@@ -36,8 +36,8 @@ const StudentELearning = () => {
   const [showSubmissionModal, setShowSubmissionModal] = useState(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user?.id]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -625,38 +625,36 @@ const StudentELearning = () => {
       </motion.div>
 
       {/* Course Selector */}
-      {["materials", "quizzes", "assignments"].includes(activeTab) && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card p-4"
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="card p-4"
+      >
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Sélectionnez un cours
+        </label>
+        <select
+          value={
+            selectedCourse?.course_id ||
+            selectedCourse?.class?.course_id ||
+            ""
+          }
+          onChange={(e) => handleCourseChange(e.target.value)}
+          className="w-full p-3 rounded-xl bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
         >
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Sélectionnez un cours
-          </label>
-          <select
-            value={
-              selectedCourse?.course_id ||
-              selectedCourse?.class?.course_id ||
-              ""
-            }
-            onChange={(e) => handleCourseChange(e.target.value)}
-            className="w-full p-3 rounded-xl bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
-          >
-            <option value="">-- Sélectionner un cours --</option>
-            {enrolledCourses.map((enrollment) => (
-              <option
-                key={enrollment.id}
-                value={enrollment.course_id || enrollment.class?.course_id}
-              >
-                {enrollment.class?.course?.name ||
-                  enrollment.course?.name ||
-                  "Cours"}
-              </option>
-            ))}
-          </select>
-        </motion.div>
-      )}
+          <option value="">-- Sélectionner un cours --</option>
+          {enrolledCourses.map((enrollment) => (
+            <option
+              key={enrollment.id}
+              value={enrollment.course_id || enrollment.class?.course_id}
+            >
+              {enrollment.class?.course?.name ||
+                enrollment.course?.name ||
+                "Cours"}
+            </option>
+          ))}
+        </select>
+      </motion.div>
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 dark:bg-dark-200 p-1 rounded-xl overflow-x-auto">
@@ -684,9 +682,20 @@ const StudentELearning = () => {
       {/* Content */}
       <div className="min-h-[400px]">
         {/* Online Courses */}
-        {activeTab === "courses" && (
+        {activeTab === "courses" && (() => {
+          const selectedCourseId = selectedCourse?.course_id || selectedCourse?.class?.course_id
+          const filteredOnlineCourses = selectedCourseId
+            ? onlineCourses.filter(c => c.course_id === parseInt(selectedCourseId))
+            : onlineCourses
+          return (
           <div className="space-y-4">
-            {isLoading ? (
+            {!selectedCourse ? (
+              <EmptyState
+                icon={VideoCameraIcon}
+                title="Sélectionnez un cours"
+                description="Choisissez un cours pour voir les sessions en ligne programmées par votre professeur"
+              />
+            ) : isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2].map((i) => (
                   <div
@@ -695,7 +704,7 @@ const StudentELearning = () => {
                   />
                 ))}
               </div>
-            ) : onlineCourses.length === 0 ? (
+            ) : filteredOnlineCourses.length === 0 ? (
               <EmptyState
                 icon={VideoCameraIcon}
                 title="Aucun cours en ligne disponible"
@@ -703,7 +712,7 @@ const StudentELearning = () => {
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {onlineCourses.map((course) => (
+                {filteredOnlineCourses.map((course) => (
                   <motion.div
                     key={course.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -801,7 +810,8 @@ const StudentELearning = () => {
               </div>
             )}
           </div>
-        )}
+          )
+        })()}
 
         {/* Materials */}
         {activeTab === "materials" && (

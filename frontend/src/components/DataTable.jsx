@@ -23,12 +23,22 @@ export default function DataTable({
 
   // Filter data based on search
   const filteredData = searchable && searchTerm
-    ? data.filter((row) =>
-        columns.some((col) => {
+    ? data.filter((row) => {
+        const term = searchTerm.toLowerCase()
+        // Search through columns that have accessors
+        const matchesColumn = columns.some((col) => {
           const value = col.accessor ? (typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor]) : ''
-          return value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          return value?.toString().toLowerCase().includes(term)
         })
-      )
+        if (matchesColumn) return true
+        // Also search common nested fields for rows without accessors
+        const searchableValues = [
+          row.user?.first_name, row.user?.last_name, row.user?.email,
+          row.student_id, row.employee_id, row.name, row.code, row.title,
+          row.department?.name, row.status, row.level,
+        ].filter(Boolean)
+        return searchableValues.some(v => v.toString().toLowerCase().includes(term))
+      })
     : data
 
   // Pagination
