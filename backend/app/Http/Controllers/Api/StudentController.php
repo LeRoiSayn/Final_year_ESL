@@ -326,7 +326,9 @@ class StudentController extends Controller
     public function grades(Student $student)
     {
         $enrollments = $student->enrollments()
-            ->with(['class.course', 'grades'])
+            ->with(['class.course', 'grades' => function ($q) {
+                $q->whereNotNull('validated_at');
+            }])
             ->get();
 
         return $this->success($enrollments);

@@ -84,6 +84,14 @@ class DashboardController extends Controller
 
         $pendingFees = $fees->where('status', '!=', 'paid')->sum('balance');
 
+        $nextFee = $fees->where('status', '!=', 'paid')
+            ->filter(fn($f) => $f->due_date !== null)
+            ->sortBy('due_date')
+            ->first();
+        $daysUntilDue = $nextFee
+            ? (int) now()->startOfDay()->diffInDays($nextFee->due_date->startOfDay(), false)
+            : null;
+
         return $this->success([
             'enrolled_courses' => $enrollments->count(),
             'attendance_rate' => $attendanceRate,
@@ -94,6 +102,8 @@ class DashboardController extends Controller
                 'total' => $fees->sum('amount'),
                 'paid' => $fees->sum('paid_amount'),
                 'pending' => $pendingFees,
+                'next_due_date' => $nextFee?->due_date?->toDateString(),
+                'days_until_due' => $daysUntilDue,
             ],
         ]);
     }

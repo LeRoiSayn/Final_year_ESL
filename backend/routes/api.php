@@ -101,9 +101,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('student-fees', StudentFeeController::class);
     Route::get('/student-fees/student/{studentId}', [StudentFeeController::class, 'byStudent']);
     Route::post('/student-fees/assign-all', [StudentFeeController::class, 'assignToAll']);
+    Route::put('/student-fees/{studentFee}/installment-plan', [StudentFeeController::class, 'setInstallmentPlan']);
 
-    // Payments (Old)
-    Route::apiResource('payments', PaymentController::class)->except(['update']);
+    // Payments
+    Route::apiResource('payments', PaymentController::class);
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt']);
     Route::get('/payments-today', [PaymentController::class, 'todayCollection']);
 
@@ -263,4 +264,5 @@ Route::middleware('auth:sanctum')->prefix('registrar')->group(function () {
     Route::delete('/users/{id}', [RegistrarController::class, 'deleteUser']);
     Route::post('/users/{id}/reset-password', [RegistrarController::class, 'resetPassword']);
     Route::put('/users/{id}/profile', [RegistrarController::class, 'updateUserProfile']);
+    Route::post('/users/{id}/profile', [RegistrarController::class, 'updateUserProfile']);
 });

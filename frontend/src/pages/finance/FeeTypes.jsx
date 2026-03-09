@@ -35,7 +35,7 @@ export default function FinanceFeeTypes() {
   const handleDelete = async (item) => { if (!window.confirm('Delete?')) return; try { await feeTypeApi.delete(item.id); toast.success(t('item_deleted')); fetchData() } catch (error) { toast.error(t('error')) } }
   const handleToggle = async (item) => { try { await feeTypeApi.toggle(item.id); toast.success(t(item.is_active ? 'deactivated' : 'activated')); fetchData() } catch (error) { toast.error(t('error')) } }
 
-  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
+  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' RWF'
 
   const columns = [
     { header: 'Fee Type', cell: (row) => (
@@ -67,7 +67,7 @@ export default function FinanceFeeTypes() {
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Fee Type' : 'Add Fee Type'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="label">Name</label><input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="input" required /></div>
-          <div><label className="label">Amount (FCFA)</label><input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="input" required min="0" /></div>
+          <div><label className="label">Amount (RWF)</label><input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="input" required min="0" /></div>
           <div><label className="label">Description</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="input" rows={3} /></div>
           <div className="flex items-center gap-2"><input type="checkbox" checked={formData.is_mandatory} onChange={(e) => setFormData({...formData, is_mandatory: e.target.checked})} className="w-4 h-4 rounded border-gray-300" /><label className="text-sm">Mandatory fee</label></div>
           <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button><button type="submit" className="btn-primary">{editing ? 'Update' : 'Create'}</button></div>

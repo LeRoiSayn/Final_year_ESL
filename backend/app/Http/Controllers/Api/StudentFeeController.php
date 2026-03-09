@@ -169,4 +169,53 @@ class StudentFeeController extends Controller
 
         return $this->success(['assigned' => $assigned], "Fee assigned to {$assigned} students");
     }
+
+    /**
+     * Attach an installment plan (JSON) to an existing fee record.
+     * Does NOT create new fee records — splits the remaining balance only.
+     */
+    public function setInstallmentPlan(Request $request, StudentFee $studentFee)
+    {
+        $request->validate([
+            'plan_type'  => 'required|in:monthly,quarterly',
+            'periods'    => 'required|integer|min:2|max:24',
+            'start_date' => 'required|date',
+        ]);
+
+        $remaining  = round((float) $studentFee->amount - (float) $studentFee->paid_amount, 2);
+        $periods    = (int) $request->periods;
+        $baseAmount = floor(($remaining / $periods) * 100) / 100;
+        $lastAmount = round($remaining - $baseAmount * ($periods - 1), 2);
+
+        $startDate    = \Carbon\Carbon::parse($request->start_date);
+        $installments = [];
+
+        for ($i = 0; $i < $periods; $i++) {
+            $dueDate = $request->plan_type === 'monthly'
+                ? $startDate->copy()->addMonths($i)
+                : $startDate->copy()->addMonths($i * 3);
+
+            $installments[] = [
+                'number'   => $i + 1,
+                'amount'   => ($i === $periods - 1) ? $lastAmount : $baseAmount,
+                'due_date' => $dueDate->toDateString(),
+                'paid'     => false,
+            ];
+        }
+
+        $studentFee->installment_plan = [
+            'plan_type'        => $request->plan_type,
+            'periods'          => $periods,
+            'base_paid_amount' => (float) $studentFee->paid_amount, // paid amount at plan creation time
+            'installments'     => $installments,
+        ];
+        $studentFee->save();
+
+        ActivityLog::log('update', "Installment plan ({$request->plan_type}, {$periods} tranches) set on fee #{$studentFee->id}");
+
+        return $this->success(
+            $studentFee->load(['student.user', 'feeType']),
+            "Plan défini : {$periods} tranches de " . number_format($baseAmount, 0, '.', ' ') . " RWF."
+        );
+    }
 }

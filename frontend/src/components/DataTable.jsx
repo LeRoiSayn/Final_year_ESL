@@ -17,6 +17,8 @@ export default function DataTable({
   actions,
   loading = false,
   emptyMessage = 'No data available',
+  onRowClick,
+  rowClassName,
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -130,6 +132,8 @@ export default function DataTable({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: rowIndex * 0.05 }}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-300' : ''} ${rowClassName ? rowClassName(row) : ''}`}
                 >
                   {columns.filter(col => !col.hidden).map((col) => (
                     <td key={col.header} className={col.className}>

@@ -165,6 +165,7 @@ export const studentFeeApi = {
   delete: (id) => api.delete(`/student-fees/${id}`),
   getByStudent: (studentId) => api.get(`/student-fees/student/${studentId}`),
   assignToAll: (data) => api.post("/student-fees/assign-all", data),
+  setInstallmentPlan: (feeId, data) => api.put(`/student-fees/${feeId}/installment-plan`, data),
 };
 
 // Payment APIs
@@ -172,6 +173,7 @@ export const paymentApi = {
   getAll: (params) => api.get("/payments", { params }),
   getOne: (id) => api.get(`/payments/${id}`),
   create: (data) => api.post("/payments", data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
   initialize: (data) => api.post("/payment/initialize", data),
   delete: (id) => api.delete(`/payments/${id}`),
   getReceipt: (id) => api.get(`/payments/${id}/receipt`),
@@ -227,6 +229,15 @@ export const adminApi = {
   rejectClassGrades: (classId, reason) => api.post(`/admin/grades/reject-class/${classId}`, { reason }),
   addStudentCourse: (studentId, data) => api.post(`/admin/students/${studentId}/courses`, data),
   removeStudentCourse: (studentId, courseId) => api.delete(`/admin/students/${studentId}/courses/${courseId}`),
+};
+
+// Registrar user management APIs
+export const registrarApi = {
+  getUsers: (role) => api.get("/registrar/users", { params: { role } }),
+  createUser: (formData) => api.post("/registrar/users", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  updateUser: (id, formData) => api.post(`/registrar/users/${id}/profile`, formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  deleteUser: (id) => api.delete(`/registrar/users/${id}`),
+  resetPassword: (id, password) => api.post(`/registrar/users/${id}/reset-password`, { password }),
 };
 
 // Notification API

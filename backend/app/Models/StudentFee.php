@@ -17,12 +17,14 @@ class StudentFee extends Model
         'due_date',
         'status',
         'academic_year',
+        'installment_plan',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_date' => 'date',
+        'installment_plan' => 'array',
     ];
 
     public function student()

@@ -71,6 +71,35 @@ class PaymentController extends Controller
     }
 
     /**
+     * Update a payment (finance correction)
+     */
+    public function update(Request $request, $id)
+    {
+        $payment = Payment::findOrFail($id);
+
+        $request->validate([
+            'amount'         => 'sometimes|numeric|min:1',
+            'payment_method' => 'sometimes|string',
+            'payment_date'   => 'sometimes|date',
+            'notes'          => 'nullable|string',
+        ]);
+
+        // Adjust paid_amount on the associated fee by delta
+        if ($request->has('amount') && $request->amount != $payment->amount) {
+            $fee = $payment->studentFee;
+            if ($fee) {
+                $delta = $request->amount - $payment->amount;
+                $fee->paid_amount = max(0, $fee->paid_amount + $delta);
+                $fee->updateStatus();
+            }
+        }
+
+        $payment->update($request->only(['amount', 'payment_method', 'payment_date', 'notes']));
+
+        return $this->success($payment->load(['studentFee.student.user', 'studentFee.feeType']), 'Paiement modifié');
+    }
+
+    /**
      * Delete a payment
      */
     public function destroy($id)

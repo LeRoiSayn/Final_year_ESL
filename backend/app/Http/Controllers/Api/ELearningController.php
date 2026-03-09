@@ -958,12 +958,15 @@ class ELearningController extends Controller
             ->orderBy('completed_at', 'desc')
             ->get()
             ->map(function ($attempt) {
+                $student = $attempt->student;
                 return [
                     'id' => $attempt->id,
                     'student' => [
-                        'id' => $attempt->student->id,
-                        'name' => $attempt->student->user->first_name . ' ' . $attempt->student->user->last_name,
-                        'registration_number' => $attempt->student->registration_number ?? $attempt->student->student_id,
+                        'id' => $student?->id,
+                        'name' => $student
+                            ? (($student->user?->first_name ?? '') . ' ' . ($student->user?->last_name ?? ''))
+                            : 'Étudiant inconnu',
+                        'registration_number' => $student?->student_id ?? 'N/A',
                     ],
                     'score' => $attempt->score,
                     'correct_count' => $attempt->correct_count,
@@ -974,13 +977,14 @@ class ELearningController extends Controller
                 ];
             });
 
+        $count = $attempts->count();
         $stats = [
-            'total_attempts' => $attempts->count(),
-            'average_score' => $attempts->avg('score'),
-            'highest_score' => $attempts->max('score'),
-            'lowest_score' => $attempts->min('score'),
-            'pass_rate' => $attempts->count() > 0 
-                ? ($attempts->where('score', '>=', $quiz->passing_score)->count() / $attempts->count()) * 100 
+            'total_attempts' => $count,
+            'average_score' => $count > 0 ? round((float)$attempts->avg('score'), 2) : 0,
+            'highest_score' => $count > 0 ? (float)$attempts->max('score') : 0,
+            'lowest_score'  => $count > 0 ? (float)$attempts->min('score') : 0,
+            'pass_rate'     => $count > 0
+                ? round(($attempts->where('score', '>=', $quiz->passing_score)->count() / $count) * 100, 1)
                 : 0,
         ];
 

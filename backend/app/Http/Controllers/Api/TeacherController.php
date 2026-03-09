@@ -282,8 +282,9 @@ class TeacherController extends Controller
         ]);
 
         $course = \App\Models\Course::findOrFail($request->course_id);
-        $academicYear = $request->academic_year ?? (date('Y') . '-' . (date('Y') + 1));
-        $semester = $request->semester ?? (date('n') <= 6 ? '2' : '1');
+        $month = (int) date('n');
+        $academicYear = $request->academic_year ?? ($month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y'));
+        $semester = $request->semester ?? ($course->semester ?? ($month >= 9 ? '1' : '2'));
         $section = $request->section ?? 'A';
 
         // Check if this course is already assigned to this teacher for this period
@@ -300,12 +301,15 @@ class TeacherController extends Controller
 
         DB::beginTransaction();
         try {
-            // Check if this class exists with another teacher
+            // Check if this class exists with another teacher or no teacher (NULL)
             $classWithOtherTeacher = \App\Models\ClassModel::where('course_id', $course->id)
                 ->where('academic_year', $academicYear)
                 ->where('semester', $semester)
                 ->where('section', $section)
-                ->where('teacher_id', '!=', $teacher->id)
+                ->where(function ($q) use ($teacher) {
+                    $q->where('teacher_id', '!=', $teacher->id)
+                      ->orWhereNull('teacher_id');
+                })
                 ->first();
 
             if ($classWithOtherTeacher) {

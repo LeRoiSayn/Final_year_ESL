@@ -24,6 +24,10 @@ class QuizAttempt extends Model
 
     protected $casts = [
         'answers' => 'array',
+        'score' => 'float',
+        'correct_count' => 'integer',
+        'total_questions' => 'integer',
+        'tab_switches' => 'integer',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

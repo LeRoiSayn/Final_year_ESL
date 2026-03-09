@@ -23,6 +23,7 @@ import {
   AcademicCapIcon,
   ChartBarIcon,
   CloudArrowUpIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 import { useI18n } from "../../i18n/index.jsx";
@@ -267,7 +268,11 @@ const ELearning = () => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-        await api.post("/elearning/courses", formData);
+        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
+        await api.post("/elearning/courses", {
+          ...formData,
+          scheduled_at: toUTC(formData.scheduled_at),
+        });
         toast.success(t('course_online_created'));
         setShowModal(null);
         fetchData();
@@ -381,7 +386,11 @@ const ELearning = () => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-        await handleUpdateCourse(editingCourse.id, formData);
+        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
+        await handleUpdateCourse(editingCourse.id, {
+          ...formData,
+          scheduled_at: toUTC(formData.scheduled_at),
+        });
       } finally {
         setIsSubmitting(false);
       }
@@ -743,7 +752,15 @@ const ELearning = () => {
       }
       setIsSubmitting(true);
       try {
-        await api.post("/elearning/quizzes", formData);
+        // Convert datetime-local strings (local time, no TZ) to UTC ISO so the
+        // server stores the correct moment regardless of server/client timezone mismatch.
+        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
+        const payload = {
+          ...formData,
+          available_from: toUTC(formData.available_from),
+          available_until: toUTC(formData.available_until),
+        };
+        await api.post("/elearning/quizzes", payload);
         toast.success(t('quiz_created'));
         setShowModal(null);
         if (selectedCourse)
@@ -1093,7 +1110,11 @@ const ELearning = () => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-        await api.post("/elearning/assignments", formData);
+        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
+        await api.post("/elearning/assignments", {
+          ...formData,
+          due_date: toUTC(formData.due_date),
+        });
         toast.success(t('assignment_created'));
         setShowModal(null);
         if (selectedCourse)
@@ -1295,6 +1316,77 @@ const ELearning = () => {
       fetchResults();
     }, [selectedItem]);
 
+    const handlePrint = () => {
+      if (!data) return;
+      const quiz = data.quiz;
+      const stats = data.stats;
+      const attempts = data.attempts || [];
+      const printDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      const rows = attempts.map((a) => `
+        <tr>
+          <td>${a.student?.name || '—'}</td>
+          <td>${a.student?.registration_number || '—'}</td>
+          <td class="${a.score >= quiz.passing_score ? 'pass' : 'fail'}">${typeof a.score === 'number' ? a.score.toFixed(1) : a.score}/${quiz.total_points}</td>
+          <td>${a.correct_count}/${a.total_questions}</td>
+          <td>${a.completed_at ? new Date(a.completed_at).toLocaleString('fr-FR') : '—'}</td>
+        </tr>`).join('');
+
+      const html = `<!DOCTYPE html><html lang="fr"><head>
+        <meta charset="UTF-8"/>
+        <title>Résultats: ${quiz?.title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 30px; color: #111; font-size: 13px; }
+          .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1e40af; padding-bottom: 16px; }
+          .header img { height: 70px; margin-bottom: 8px; }
+          .header h1 { font-size: 18px; color: #1e40af; margin: 4px 0; }
+          .header h2 { font-size: 14px; font-weight: normal; margin: 2px 0; color: #444; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; color: #555; }
+          .stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 20px; }
+          .stat-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; }
+          .stat-box .val { font-size: 20px; font-weight: bold; color: #1e40af; }
+          .stat-box .lbl { font-size: 11px; color: #666; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+          td { padding: 7px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
+          tr:nth-child(even) td { background: #f8f9fa; }
+          .pass { color: #16a34a; font-weight: bold; }
+          .fail { color: #dc2626; font-weight: bold; }
+          @media print { body { margin: 15px; } }
+        </style>
+      </head><body>
+        <div class="header">
+          <img src="/esl-logo.png" onerror="this.style.display='none'"/>
+          <h1>École de santé de Libreville</h1>
+          <h2>Résultats du Quiz — ${quiz?.title || ''}</h2>
+        </div>
+        <div class="meta">
+          <span>Cours: ${selectedCourse?.name || selectedCourse?.class?.course?.name || '—'}</span>
+          <span>Seuil de réussite: ${quiz?.passing_score}/${quiz?.total_points}</span>
+          <span>Imprimé le ${printDate}</span>
+        </div>
+        <div class="stats">
+          <div class="stat-box"><div class="val">${stats?.total_attempts ?? 0}</div><div class="lbl">Tentatives</div></div>
+          <div class="stat-box"><div class="val">${typeof stats?.average_score === 'number' ? stats.average_score.toFixed(1) : '—'}</div><div class="lbl">Moyenne</div></div>
+          <div class="stat-box"><div class="val" style="color:#16a34a">${typeof stats?.highest_score === 'number' ? stats.highest_score.toFixed(1) : '—'}</div><div class="lbl">Maximum</div></div>
+          <div class="stat-box"><div class="val" style="color:#dc2626">${typeof stats?.lowest_score === 'number' ? stats.lowest_score.toFixed(1) : '—'}</div><div class="lbl">Minimum</div></div>
+          <div class="stat-box"><div class="val">${typeof stats?.pass_rate === 'number' ? stats.pass_rate.toFixed(0) : '—'}%</div><div class="lbl">Taux de réussite</div></div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Étudiant</th><th>Matricule</th><th>Score</th><th>Réponses correctes</th><th>Date</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body></html>`;
+
+      const pw = window.open('', '_blank');
+      pw.document.write(html);
+      pw.document.close();
+      pw.focus();
+      setTimeout(() => { pw.print(); }, 400);
+    };
+
     if (loading)
       return (
         <Modal title="Résultats du Quiz" onClose={() => setShowModal(null)}>
@@ -1311,6 +1403,16 @@ const ELearning = () => {
         size="xl"
       >
         <div className="space-y-6">
+          {/* Print button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-dark-200 hover:bg-gray-200 dark:hover:bg-dark-100 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
+            >
+              <PrinterIcon className="w-4 h-4" />
+              Imprimer
+            </button>
+          </div>
           {/* Stats */}
           <div className="grid grid-cols-5 gap-4">
             <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
@@ -1770,28 +1872,47 @@ const ELearning = () => {
           <ClipboardDocumentListIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
         </div>
         <span
-          className={`text-xs font-medium px-2 py-1 rounded-full ${quiz.status === "published" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}
+          className={`text-xs font-medium px-2 py-1 rounded-full ${quiz.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-400"}`}
         >
-          {quiz.status === "published" ? "Publié" : "Brouillon"}
+          {quiz.status === "published" ? t("published") : t("draft")}
         </span>
       </div>
       <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
         {quiz.title}
       </h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-        {quiz.questions?.length || 0} questions • {quiz.duration_minutes} min
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+        {quiz.questions?.length || 0} {t("elearning_questions")} • {quiz.duration_minutes} min
       </p>
+      {/* Availability window */}
+      {(quiz.available_from || quiz.available_until) && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-2 bg-gray-50 dark:bg-dark-300 px-2 py-1.5 rounded-lg">
+          <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            {quiz.available_from
+              ? new Date(quiz.available_from).toLocaleString(undefined, {
+                  day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                })
+              : "…"}
+            {" → "}
+            {quiz.available_until
+              ? new Date(quiz.available_until).toLocaleString(undefined, {
+                  day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                })
+              : "…"}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-        <span>Total: {quiz.total_points} pts</span>
-        <span>Passage: {quiz.passing_score} pts</span>
+        <span>{t("total")}: {quiz.total_points} pts</span>
+        <span>{t("passing_score")}: {quiz.passing_score} pts</span>
       </div>
       <div className="flex gap-2">
         {quiz.status === "draft" && (
           <button
             onClick={() => publishQuiz(quiz.id)}
-            className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium"
+            className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
           >
-            Publier
+            {t("publish")}
           </button>
         )}
         {quiz.status === "published" && (
@@ -1800,9 +1921,9 @@ const ELearning = () => {
               setSelectedItem(quiz);
               setShowModal("quiz-results");
             }}
-            className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium"
+            className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
           >
-            Voir résultats
+            {t("view_results")}
           </button>
         )}
         <button

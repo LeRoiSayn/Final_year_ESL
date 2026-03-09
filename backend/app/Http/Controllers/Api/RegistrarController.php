@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class RegistrarController extends Controller
@@ -25,7 +26,7 @@ class RegistrarController extends Controller
         }
 
         $users = User::where('role', $role)
-            ->select('id', 'first_name', 'last_name', 'email', 'username', 'phone', 'date_of_birth', 'is_active', 'created_at')
+            ->select('id', 'first_name', 'last_name', 'email', 'username', 'phone', 'date_of_birth', 'is_active', 'profile_image', 'created_at')
             ->orderBy('first_name')
             ->get();
 
@@ -48,7 +49,13 @@ class RegistrarController extends Controller
             'phone'         => 'nullable|string|max:20',
             'date_of_birth' => 'nullable|date',
             'role'          => ['required', Rule::in(['admin', 'finance', 'registrar'])],
+            'profile_image' => 'nullable|image|max:2048',
         ]);
+
+        $profileImagePath = null;
+        if ($request->hasFile('profile_image')) {
+            $profileImagePath = $request->file('profile_image')->store('profile-images', 'public');
+        }
 
         $user = User::create([
             'first_name'    => $data['first_name'],
@@ -59,6 +66,7 @@ class RegistrarController extends Controller
             'phone'         => $data['phone'] ?? null,
             'date_of_birth' => $data['date_of_birth'] ?? null,
             'role'          => $data['role'],
+            'profile_image' => $profileImagePath,
             'is_active'     => true,
         ]);
 
@@ -79,6 +87,10 @@ class RegistrarController extends Controller
         // Prevent self-deletion
         if ($user->id === $request->user()->id) {
             return $this->error('You cannot delete your own account', 403);
+        }
+
+        if ($user->profile_image) {
+            Storage::disk('public')->delete($user->profile_image);
         }
 
         ActivityLog::log('user_delete', "Registrar deleted user: {$user->username}", $request->user());
@@ -113,7 +125,7 @@ class RegistrarController extends Controller
     }
 
     /**
-     * Update a user's profile fields (registrar only).
+     * Update a user's full profile (registrar only) — includes email, username, password, photo.
      */
     public function updateUserProfile(Request $request, $id)
     {
@@ -124,16 +136,37 @@ class RegistrarController extends Controller
         $data = $request->validate([
             'first_name'    => 'sometimes|string|max:255',
             'last_name'     => 'sometimes|string|max:255',
+            'email'         => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'username'      => ['sometimes', 'string', 'max:100', Rule::unique('users', 'username')->ignore($user->id)],
+            'password'      => 'sometimes|nullable|string|min:8',
             'phone'         => 'sometimes|nullable|string|max:20',
             'address'       => 'sometimes|nullable|string|max:255',
             'date_of_birth' => 'sometimes|nullable|date',
+            'profile_image' => 'sometimes|nullable|image|max:2048',
         ]);
+
+        // Handle password
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        // Handle profile image upload
+        if ($request->hasFile('profile_image')) {
+            if ($user->profile_image) {
+                Storage::disk('public')->delete($user->profile_image);
+            }
+            $data['profile_image'] = $request->file('profile_image')->store('profile-images', 'public');
+        } else {
+            unset($data['profile_image']);
+        }
 
         $user->update($data);
 
         ActivityLog::log('profile_update', "Registrar updated profile for: {$user->username}", $request->user());
 
-        return $this->success($user, 'Profile updated successfully');
+        return $this->success($user->fresh(), 'Profile updated successfully');
     }
 
     // ─── Private helpers ────────────────────────────────────────────────────

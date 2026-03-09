@@ -18,69 +18,67 @@ export default function StudentDashboard() {
     catch (error) { console.error('Failed to fetch stats:', error) } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
+  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' RWF'
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
   const pendingFees = stats?.fees_summary?.pending || 0
-  const isPaid = pendingFees <= 0
   const totalFees = stats?.fees_summary?.total || 0
   const paidAmount = stats?.fees_summary?.paid || 0
   const paymentPercent = totalFees > 0 ? Math.round((paidAmount / totalFees) * 100) : 100
+  const daysUntilDue = stats?.fees_summary?.days_until_due ?? null
+  // Only show banner when payment is due within 7 days (orange level) or overdue
+  const showBanner = pendingFees > 0 && daysUntilDue !== null && daysUntilDue <= 7
 
   return (
     <div className="space-y-6">
-      {/* Payment Status Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`rounded-xl p-4 flex items-center gap-4 ${
-          isPaid
-            ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
-            : 'bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700'
-        }`}
-      >
-        <div className={`p-3 rounded-full ${isPaid ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
-          {isPaid ? (
-            <CheckCircleIcon className="w-7 h-7 text-green-600 dark:text-green-400" />
-          ) : (
-            <ExclamationTriangleIcon className="w-7 h-7 text-red-600 dark:text-red-400" />
-          )}
-        </div>
-        <div className="flex-1">
-          <h3 className={`font-semibold text-lg ${isPaid ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-            {isPaid ? t('account_ok') : t('payment_pending')}
-          </h3>
-          <p className={`text-sm ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {isPaid
-              ? t('fees_up_to_date')
-              : t('remaining_balance_notice').replace('{amount}', formatCurrency(pendingFees))
-            }
-          </p>
-          {!isPaid && totalFees > 0 && (
-            <div className="mt-2">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-red-500 dark:text-red-400">{paymentPercent}% {t('paid_percent')}</span>
-                <span className="text-red-500 dark:text-red-400">{formatCurrency(paidAmount)} / {formatCurrency(totalFees)}</span>
+      {/* Payment Status Banner — only shown when due date is within 7 days */}
+      {showBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`rounded-xl p-4 flex items-center gap-4 ${
+            daysUntilDue < 0
+              ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700'
+              : 'bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700'
+          }`}
+        >
+          <div className={`p-3 rounded-full ${daysUntilDue < 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-orange-100 dark:bg-orange-900/40'}`}>
+            <ExclamationTriangleIcon className={`w-7 h-7 ${daysUntilDue < 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`} />
+          </div>
+          <div className="flex-1">
+            <h3 className={`font-semibold text-lg ${daysUntilDue < 0 ? 'text-red-800 dark:text-red-300' : 'text-orange-800 dark:text-orange-300'}`}>
+              {daysUntilDue < 0 ? t('payment_overdue') : t('payment_due_soon')}
+            </h3>
+            <p className={`text-sm ${daysUntilDue < 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
+              {daysUntilDue < 0
+                ? t('remaining_balance_notice').replace('{amount}', formatCurrency(pendingFees))
+                : t('payment_due_in_days').replace('{days}', daysUntilDue).replace('{amount}', formatCurrency(pendingFees))
+              }
+            </p>
+            {totalFees > 0 && (
+              <div className="mt-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className={daysUntilDue < 0 ? 'text-red-500' : 'text-orange-500'}>{paymentPercent}% {t('paid_percent')}</span>
+                  <span className={daysUntilDue < 0 ? 'text-red-500' : 'text-orange-500'}>{formatCurrency(paidAmount)} / {formatCurrency(totalFees)}</span>
+                </div>
+                <div className={`h-2 rounded-full overflow-hidden ${daysUntilDue < 0 ? 'bg-red-200 dark:bg-red-900/40' : 'bg-orange-200 dark:bg-orange-900/40'}`}>
+                  <div
+                    className={`h-full rounded-full transition-all ${daysUntilDue < 0 ? 'bg-red-500' : 'bg-orange-500'}`}
+                    style={{ width: `${paymentPercent}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-red-500 rounded-full transition-all"
-                  style={{ width: `${paymentPercent}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-        {!isPaid && (
+            )}
+          </div>
           <Link
             to="/student/payment"
-            className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
+            className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${daysUntilDue < 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-orange-500 hover:bg-orange-600'}`}
           >
             {t('pay_now')}
           </Link>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
 
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('student_dashboard')}</h1>

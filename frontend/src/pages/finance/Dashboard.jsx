@@ -16,7 +16,7 @@ export default function FinanceDashboard() {
     catch (error) { console.error('Failed to fetch stats:', error) } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
+  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' RWF'
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 

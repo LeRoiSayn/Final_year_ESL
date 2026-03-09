@@ -21,7 +21,6 @@ import { settingsApi } from "../services/api";
 const STORAGE_KEY = "esl_user_settings";
 
 const defaultSettings = {
-  theme: "auto",
   font_size: 100,
   language: "fr",
   email_notifications: true,
@@ -31,10 +30,16 @@ const defaultSettings = {
 };
 
 const Settings = () => {
-  const { isDark, setIsDark } = useTheme();
+  const { themeMode, setThemeMode } = useTheme();
   const { user } = useAuth();
   const { t, language, setLanguage } = useI18n();
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) return { ...defaultSettings, ...JSON.parse(stored) }
+    } catch (e) {}
+    return defaultSettings
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -101,15 +106,8 @@ const Settings = () => {
     }
   }, []);
 
-  // Apply settings immediately
+  // Apply non-theme settings immediately
   const applySettings = (newSettings) => {
-    if (newSettings.theme === "dark") {
-      setIsDark(true);
-    } else if (newSettings.theme === "light") {
-      setIsDark(false);
-    } else {
-      setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
-    }
     document.documentElement.style.fontSize = `${newSettings.font_size}%`;
   };
 
@@ -118,7 +116,7 @@ const Settings = () => {
     setSettings(newSettings);
 
     // Apply immediately for visual settings
-    if (["theme", "font_size"].includes(key)) {
+    if (key === "font_size") {
       applySettings(newSettings);
     }
 
@@ -129,7 +127,7 @@ const Settings = () => {
   };
 
   const handleThemeChange = (themeId) => {
-    handleSettingChange("theme", themeId);
+    setThemeMode(themeId);
   };
 
   const toggleWidget = (widgetId) => {
@@ -147,7 +145,7 @@ const Settings = () => {
       applySettings(settings);
       setSaved(true);
       settingsApi
-        .update({ language: settings.language, theme: settings.theme })
+        .update({ language: settings.language, theme: themeMode })
         .catch(() => {});
       toast.success(t("settings_saved"));
       setTimeout(() => setSaved(false), 2000);
@@ -163,6 +161,7 @@ const Settings = () => {
     setSettings(defaultSettings);
     localStorage.removeItem(STORAGE_KEY);
     applySettings(defaultSettings);
+    setThemeMode('auto');
     setLanguage(defaultSettings.language);
     toast.success(t("settings_reset"));
   };
@@ -238,21 +237,21 @@ const Settings = () => {
                 key={theme.id}
                 onClick={() => handleThemeChange(theme.id)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                  settings.theme === theme.id
+                  themeMode === theme.id
                     ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
                     : "border-gray-200 dark:border-dark-100 hover:border-gray-300"
                 }`}
               >
                 <theme.icon
                   className={`w-6 h-6 ${
-                    settings.theme === theme.id
+                    themeMode === theme.id
                       ? "text-primary-500"
                       : "text-gray-400"
                   }`}
                 />
                 <span
                   className={`text-sm font-medium ${
-                    settings.theme === theme.id
+                    themeMode === theme.id
                       ? "text-primary-600 dark:text-primary-400"
                       : "text-gray-600 dark:text-gray-400"
                   }`}

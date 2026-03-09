@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n/index.jsx'
 import { teacherApi, gradeApi } from '../../services/api'
-import { BookOpenIcon, CheckCircleIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import { BookOpenIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import api from '../../services/api'
 
 /* Max scores per component */
@@ -41,7 +41,6 @@ export default function TeacherGrades() {
   const [students, setStudents]       = useState([])
   const [grades, setGrades]           = useState({})
   const [loading, setLoading]         = useState(true)
-  const [saving, setSaving]           = useState(false)
   const [submitting, setSubmitting]   = useState(false)
 
   useEffect(() => { if (user?.teacher?.id) fetchClasses() }, [user])
@@ -78,28 +77,10 @@ export default function TeacherGrades() {
     setGrades(prev => ({ ...prev, [enrollmentId]: { ...prev[enrollmentId], [field]: value } }))
   }
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const payload = Object.entries(grades)
-        .map(([id, data]) => ({
-          enrollment_id:          parseInt(id),
-          attendance_score:       data.attendance_score      !== '' ? data.attendance_score      : null,
-          quiz_score:             data.quiz_score            !== '' ? data.quiz_score            : null,
-          continuous_assessment:  data.continuous_assessment !== '' ? data.continuous_assessment : null,
-          exam_score:             data.exam_score            !== '' ? data.exam_score            : null,
-        }))
-        .filter(g => Object.values(g).some((v, i) => i > 0 && v !== null))
-      await gradeApi.bulkUpdate(payload)
-      toast.success(t('grade_saved'))
-    } catch { toast.error(t('error')) }
-    finally { setSaving(false) }
-  }
-
   const handleSubmitToAdmin = async () => {
     if (!selectedClass) return
-    // Save first, then submit
-    setSaving(true)
+    setSubmitting(true)
+    // Save grades first, then submit to admin
     try {
       const payload = Object.entries(grades)
         .map(([id, data]) => ({
@@ -111,9 +92,8 @@ export default function TeacherGrades() {
         }))
         .filter(g => Object.values(g).some((v, i) => i > 0 && v !== null))
       if (payload.length > 0) await gradeApi.bulkUpdate(payload)
-    } catch { /* ignore save errors, still attempt submit */ } finally { setSaving(false) }
+    } catch { /* ignore save errors, still attempt submit */ }
 
-    setSubmitting(true)
     try {
       await api.post(`/grades/submit-class/${selectedClass.id}`)
       toast.success(t('grade_submitted_success'))
@@ -164,13 +144,9 @@ export default function TeacherGrades() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSave} disabled={saving} className="btn-secondary flex items-center gap-2">
-                <CheckCircleIcon className="w-4 h-4" />
-                {saving ? t('saving') : t('save_grades')}
-              </button>
               <button
                 onClick={handleSubmitToAdmin}
-                disabled={saving || submitting}
+                disabled={submitting}
                 className="btn-primary flex items-center gap-2"
                 title={t('submit_grades')}
               >

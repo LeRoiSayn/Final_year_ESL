@@ -40,7 +40,7 @@ const Payment = () => {
     }
   }
 
-  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount || 0) + ' FCFA'
+  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount || 0) + ' RWF'
 
   // Payment Modal Component
   const PaymentModal = () => {

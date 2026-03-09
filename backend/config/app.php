@@ -15,7 +15,7 @@ return [
 
     'asset_url' => env('ASSET_URL'),
 
-    'timezone' => 'Africa/Libreville',
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     'locale' => 'en',
 
