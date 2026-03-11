@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useI18n } from '../i18n/index.jsx'
@@ -53,6 +53,9 @@ const menuItems = {
     { nameKey: 'menu_dashboard', path: '/registrar', icon: HomeIcon },
     { nameKey: 'menu_students', path: '/registrar/students', icon: UserGroupIcon },
     { nameKey: 'menu_teachers', path: '/registrar/teachers', icon: UsersIcon },
+    { nameKey: 'menu_admins', path: '/registrar/users?role=admin', icon: UserCircleIcon },
+    { nameKey: 'menu_finance_staff', path: '/registrar/users?role=finance', icon: CurrencyDollarIcon },
+    { nameKey: 'menu_registrars', path: '/registrar/users?role=registrar', icon: ClipboardDocumentListIcon },
     { nameKey: 'menu_settings', path: '/registrar/settings', icon: Cog6ToothIcon },
   ],
   finance: [
@@ -105,17 +108,14 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
       case 'student':
         return (
           <>
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              <span className="font-mono">{user?.student?.registration_number || 'N/A'}</span>
-            </div>
-            {user?.student?.department && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {user.student.department.name}
+            {user?.student?.student_id && (
+              <p className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                {user.student.student_id}
               </p>
             )}
-            {user?.student?.program && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {user.student.program}
+            {user?.student?.department && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {user.student.department.name}
               </p>
             )}
           </>
@@ -123,12 +123,13 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
       case 'teacher':
         return (
           <>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <EnvelopeIcon className="w-3.5 h-3.5" />
-              <span className="truncate">{user?.email}</span>
-            </div>
+            {user?.teacher?.employee_id && (
+              <p className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                {user.teacher.employee_id}
+              </p>
+            )}
             {user?.teacher?.department && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 {user.teacher.department.name}
               </p>
             )}
@@ -138,10 +139,14 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
       case 'registrar':
       case 'finance':
         return (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
-            <EnvelopeIcon className="w-3.5 h-3.5" />
-            <span className="truncate">{user?.email}</span>
-          </div>
+          <>
+            {user?.employee_id && (
+              <p className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                {user.employee_id}
+              </p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+          </>
         )
       default:
         return null
@@ -163,9 +168,6 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
             {fullName}
-          </p>
-          <p className="text-xs font-medium text-primary-600 dark:text-primary-400">
-            {t(`role_${role}`)}
           </p>
           {renderProfileDetails()}
         </div>
@@ -189,6 +191,7 @@ export default function DashboardLayout() {
   const { isDark, toggleTheme } = useTheme()
   const { t } = useI18n()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const items = menuItems[user?.role] || []
 
@@ -244,24 +247,33 @@ export default function DashboardLayout() {
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {items.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === `/${user?.role}`}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-100 hover:text-gray-900 dark:hover:text-white'
-                  }`
-                }
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon className="w-5 h-5" />
-                <span>{t(item.nameKey)}</span>
-              </NavLink>
-            ))}
+            {items.map((item) => {
+              const hasSearch = item.path.includes('?')
+              const [itemPathname, itemSearch] = hasSearch ? item.path.split('?').map((s, i) => i === 1 ? '?' + s : s) : [item.path, null]
+              const isQueryActive = hasSearch
+                ? location.pathname === itemPathname && location.search === itemSearch
+                : null
+
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === `/${user?.role}` || hasSearch}
+                  className={({ isActive }) => {
+                    const active = hasSearch ? isQueryActive : isActive
+                    return `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-100 hover:text-gray-900 dark:hover:text-white'
+                    }`
+                  }}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{t(item.nameKey)}</span>
+                </NavLink>
+              )
+            })}
           </nav>
 
           {/* User Profile Section */}

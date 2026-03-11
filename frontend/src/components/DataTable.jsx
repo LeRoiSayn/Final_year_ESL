@@ -49,11 +49,17 @@ export default function DataTable({
   const paginatedData = pagination ? filteredData.slice(startIndex, startIndex + pageSize) : filteredData
 
   const handleExportCSV = () => {
-    const headers = columns.filter(col => !col.hidden).map((col) => col.header).join(',')
+    const exportCols = columns.filter(col => !col.hidden && !col.noExport)
+    const headers = exportCols.map((col) => col.header).join(',')
     const rows = data.map((row) =>
-      columns.filter(col => !col.hidden).map((col) => {
-        const value = col.accessor ? (typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor]) : ''
-        return `"${value || ''}"`
+      exportCols.map((col) => {
+        let value = ''
+        if (col.exportValue) {
+          value = col.exportValue(row) ?? ''
+        } else if (col.accessor) {
+          value = typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor]
+        }
+        return `"${String(value ?? '').replace(/"/g, '""')}"`
       }).join(',')
     )
     const csv = [headers, ...rows].join('\n')

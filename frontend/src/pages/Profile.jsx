@@ -13,6 +13,7 @@ import {
   EyeIcon,
   EyeSlashIcon,
   InformationCircleIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Profile() {
@@ -73,6 +74,12 @@ export default function Profile() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const getUserId = () => {
+    if (user?.role === 'student') return user?.student?.student_id
+    if (user?.role === 'teacher') return user?.teacher?.employee_id
+    return user?.employee_id
   }
 
   const roleColors = {
@@ -206,6 +213,12 @@ export default function Profile() {
             </form>
           ) : (
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {getUserId() && (
+                <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                  <IdentificationIcon className="w-5 h-5" />
+                  <span className="font-mono">{getUserId()}</span>
+                </div>
+              )}
               <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
                 <EnvelopeIcon className="w-5 h-5" />
                 <span>{user?.email}</span>

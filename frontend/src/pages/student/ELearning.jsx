@@ -354,6 +354,7 @@ const StudentELearning = () => {
   const { user } = useAuth();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("courses");
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set(["courses"]));
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [onlineCourses, setOnlineCourses] = useState([]);
   const [materials, setMaterials] = useState([]);
@@ -378,6 +379,12 @@ const StudentELearning = () => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  // Reset visited tabs when selected course changes
+  useEffect(() => {
+    setVisitedTabs(new Set(["courses"]));
+    setActiveTab("courses");
+  }, [selectedCourse?.course_id, selectedCourse?.class?.course_id]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -745,7 +752,7 @@ const StudentELearning = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => { setActiveTab(tab.id); setVisitedTabs(prev => new Set([...prev, tab.id])) }}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? "bg-white dark:bg-dark-300 text-primary-600 shadow-sm"
@@ -754,7 +761,7 @@ const StudentELearning = () => {
           >
             <tab.icon className="w-5 h-5" />
             <span>{tab.name}</span>
-            {tab.count > 0 && (
+            {tab.count > 0 && !visitedTabs.has(tab.id) && (
               <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
                 {tab.count}
               </span>

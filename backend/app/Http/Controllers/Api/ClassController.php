@@ -50,7 +50,7 @@ class ClassController extends Controller
             'room' => 'nullable|string|max:50',
             'capacity' => 'required|integer|min:1',
             'academic_year' => 'required|string|max:20',
-            'semester' => 'required|in:1,2',
+            'semester' => 'required|in:1,2,3',
         ]);
 
         // Check for duplicate

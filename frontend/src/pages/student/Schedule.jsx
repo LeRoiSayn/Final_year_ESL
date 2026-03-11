@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n/index.jsx'
 import { scheduleApi } from '../../services/api'
-import { CalendarIcon, ClockIcon, MapPinIcon } from '@heroicons/react/24/outline'
+import { CalendarIcon, ClockIcon, MapPinIcon, UserIcon } from '@heroicons/react/24/outline'
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
@@ -43,6 +43,12 @@ export default function StudentSchedule() {
                 <div key={schedule.id} className="p-4 rounded-xl bg-gradient-to-r from-primary-500/10 to-teal-500/10 border border-primary-200 dark:border-primary-800">
                   <p className="font-medium text-gray-900 dark:text-white">{schedule.class?.course?.name}</p>
                   <p className="text-sm text-gray-500">{schedule.class?.course?.code}</p>
+                  {schedule.class?.teacher?.user && (
+                    <div className="flex items-center gap-2 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      <UserIcon className="w-4 h-4" />
+                      <span>Prof. {schedule.class.teacher.user.first_name} {schedule.class.teacher.user.last_name}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-2 text-sm text-gray-600 dark:text-gray-400">
                     <ClockIcon className="w-4 h-4" />
                     <span>{schedule.start_time?.substring(0, 5)} - {schedule.end_time?.substring(0, 5)}</span>

@@ -31,6 +31,7 @@ import { useI18n } from "../../i18n/index.jsx";
 const ELearning = () => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("courses");
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set(["courses"]));
   const [myCourses, setMyCourses] = useState([]);
   const [onlineCourses, setOnlineCourses] = useState([]);
   const [materials, setMaterials] = useState([]);
@@ -111,6 +112,8 @@ const ELearning = () => {
       ? myCourses.find((c) => (c.course_id || c.id) === parseInt(courseId))
       : undefined;
     setSelectedCourse(course);
+    setVisitedTabs(new Set(["courses"]));
+    setActiveTab("courses");
     if (courseId) {
       if (activeTab === "materials") fetchMaterials(courseId);
       if (activeTab === "quizzes") fetchQuizzes(courseId);
@@ -128,6 +131,18 @@ const ELearning = () => {
         window.open(res.data.meeting_url, "_blank", "noopener,noreferrer");
       }
       toast.success(t('session_started'));
+    } catch (err) {
+      toast.error(t('error'));
+    }
+  };
+
+  const endCourse = async (id) => {
+    try {
+      await api.post(`/elearning/courses/${id}/end`);
+      setOnlineCourses((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: "ended" } : c))
+      );
+      toast.success(t('session_ended'));
     } catch (err) {
       toast.error(t('error'));
     }
@@ -1756,7 +1771,7 @@ const ELearning = () => {
     </div>
   );
 
-  const CourseCard = ({ course, onStart, onEdit }) => (
+  const CourseCard = ({ course, onStart, onEnd, onEdit }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1812,11 +1827,19 @@ const ELearning = () => {
           </button>
         )}
         {course.status === "live" && (
-          <button
-            onClick={() => course.meeting_url && window.open(course.meeting_url, "_blank", "noopener,noreferrer")}
-            className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
-            Rejoindre
-          </button>
+          <>
+            <button
+              onClick={() => course.meeting_url && window.open(course.meeting_url, "_blank", "noopener,noreferrer")}
+              className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
+              Rejoindre
+            </button>
+            <button
+              onClick={() => onEnd(course.id)}
+              className="py-2 px-3 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+              title="Terminer la session">
+              ⏹
+            </button>
+          </>
         )}
         <button
           onClick={() => onEdit(course)}
@@ -2054,7 +2077,7 @@ const ELearning = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setVisitedTabs(prev => new Set([...prev, tab.id])) }}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-white dark:bg-dark-300 text-primary-600 shadow-sm"
@@ -2063,7 +2086,7 @@ const ELearning = () => {
             >
               <tab.icon className="w-5 h-5" />
               <span className="hidden sm:inline">{tab.name}</span>
-              {tab.count > 0 && (
+              {tab.count > 0 && !visitedTabs.has(tab.id) && (
                 <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600">
                   {tab.count}
                 </span>
@@ -2102,6 +2125,7 @@ const ELearning = () => {
                       key={course.id}
                       course={course}
                       onStart={startCourse}
+                      onEnd={endCourse}
                       onEdit={setEditingCourse}
                     />
                   ))}

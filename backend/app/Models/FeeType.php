@@ -15,6 +15,7 @@ class FeeType extends Model
         'amount',
         'is_mandatory',
         'is_active',
+        'level',
     ];
 
     protected $casts = [

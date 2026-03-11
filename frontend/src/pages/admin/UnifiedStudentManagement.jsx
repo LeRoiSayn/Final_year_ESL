@@ -1,25 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   MagnifyingGlassIcon,
   UserIcon,
   AcademicCapIcon,
-  CurrencyDollarIcon,
-  PencilIcon,
   PlusIcon,
   TrashIcon,
   ChartBarIcon,
   ClockIcon,
-  CheckCircleIcon,
   XMarkIcon,
-  EyeIcon,
   BookOpenIcon,
   ArrowPathIcon,
   FunnelIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline'
-import api, { studentApi, departmentApi, courseApi } from '../../services/api'
+import api, { studentApi, departmentApi } from '../../services/api'
 import { useI18n } from '../../i18n/index.jsx'
 
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
@@ -113,7 +109,7 @@ export default function UnifiedStudentManagement() {
       const response = await api.get(`/student-management/${studentId}/available-courses`)
       setAvailableCourses(response.data.data.available_courses || [])
     } catch (error) {
-      toast.error(t('error'))
+      console.error('Failed to fetch available courses:', error)
     }
   }
 
@@ -224,28 +220,39 @@ export default function UnifiedStudentManagement() {
           {availableCourses.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <BookOpenIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No available courses found</p>
+              <p>Aucun cours disponible</p>
             </div>
           ) : (
             <div className="space-y-2">
               {availableCourses.map((course) => (
                 <div
                   key={course.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-dark-200 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors"
+                  className={`flex items-center justify-between p-4 rounded-xl transition-colors ${
+                    course.is_retake
+                      ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700'
+                      : 'bg-gray-50 dark:bg-dark-200 hover:bg-gray-100 dark:hover:bg-dark-100'
+                  }`}
                 >
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      {course.name}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {course.name}
+                      </h4>
+                      {course.is_retake && (
+                        <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded-full">
+                          À repasser
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {course.code} • {course.department?.name} • {course.credits} credits • Level {course.level}
+                      {course.code} • {course.department?.name} • {course.credits} crédits • Niveau {course.level}
                     </p>
                   </div>
                   <button
                     onClick={() => handleAssignCourse(course.id)}
                     className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
                   >
-                    Assign
+                    Assigner
                   </button>
                 </div>
               ))}
@@ -289,7 +296,9 @@ export default function UnifiedStudentManagement() {
                 className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-colors ${
                   selectedCourses.includes(course.id)
                     ? 'bg-primary-50 dark:bg-primary-900/20 border-2 border-primary-500'
-                    : 'bg-gray-50 dark:bg-dark-200 border-2 border-transparent hover:bg-gray-100 dark:hover:bg-dark-100'
+                    : course.is_retake
+                      ? 'bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700'
+                      : 'bg-gray-50 dark:bg-dark-200 border-2 border-transparent hover:bg-gray-100 dark:hover:bg-dark-100'
                 }`}
               >
                 <input
@@ -305,11 +314,18 @@ export default function UnifiedStudentManagement() {
                   className="w-5 h-5 rounded text-primary-500"
                 />
                 <div className="flex-1">
-                  <h4 className="font-medium text-gray-900 dark:text-white">
-                    {course.name}
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium text-gray-900 dark:text-white">
+                      {course.name}
+                    </h4>
+                    {course.is_retake && (
+                      <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded-full">
+                        À repasser
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {course.code} • {course.department?.name} • Level {course.level}
+                    {course.code} • {course.department?.name} • Niveau {course.level}
                   </p>
                 </div>
               </label>
@@ -640,10 +656,22 @@ export default function UnifiedStudentManagement() {
 
                 {/* Enrolled Courses - Course Management Section */}
                 <div className="card p-6">
+                  {/* Retake notice for admin */}
+                  {(studentProfile.student.retake_courses ?? []).length > 0 && (
+                    <div className="mb-4 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700">
+                      <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                        {studentProfile.student.retake_courses.length} cours à repasser
+                      </p>
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
+                        Utilisez "Ajouter un cours" pour inscrire l'étudiant aux cours du nouveau niveau et aux cours à repasser (marqués en orange).
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                       <BookOpenIcon className="w-5 h-5 text-primary-500" />
-                      Enrolled Courses
+                      Cours inscrits
                     </h3>
                     <div className="flex gap-2">
                       <button
@@ -714,27 +742,39 @@ export default function UnifiedStudentManagement() {
                   </div>
                 </div>
 
-                {/* Grades (Read-only) */}
+                {/* Grades */}
                 {studentProfile.grades?.length > 0 && (
                   <div className="card p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                       <ChartBarIcon className="w-5 h-5 text-primary-500" />
-                      Grades (Read-only)
+                      Grades
                     </h3>
                     <div className="space-y-2">
-                      {studentProfile.grades.slice(0, 5).map((grade) => (
+                      {studentProfile.grades.map((grade) => (
                         <div
                           key={grade.id}
                           className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg"
                         >
-                          <span className="text-gray-900 dark:text-white">
+                          <span className="text-gray-900 dark:text-white text-sm">
                             {grade.enrollment?.class?.course?.name}
                           </span>
-                          <span className={`font-bold ${
-                            grade.score >= 10 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {grade.score}/20
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {grade.letter_grade && (
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                grade.final_grade >= 80 ? 'bg-green-100 text-green-700' :
+                                grade.final_grade >= 65 ? 'bg-blue-100 text-blue-700' :
+                                grade.final_grade >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {grade.letter_grade}
+                              </span>
+                            )}
+                            <span className={`font-bold text-sm ${
+                              grade.final_grade >= 50 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {grade.final_grade ?? '—'}/100
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>

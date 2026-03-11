@@ -13,7 +13,7 @@ export default function FinanceFeeTypes() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [formData, setFormData] = useState({ name: '', description: '', amount: '', is_mandatory: true })
+  const [formData, setFormData] = useState({ name: '', description: '', amount: '', is_mandatory: true, level: '' })
 
   useEffect(() => { fetchData() }, [])
 
@@ -25,13 +25,13 @@ export default function FinanceFeeTypes() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      if (editing) { await feeTypeApi.update(editing.id, formData); toast.success(t('item_updated')) } 
+      if (editing) { await feeTypeApi.update(editing.id, formData); toast.success(t('item_updated')) }
       else { await feeTypeApi.create(formData); toast.success(t('item_created')) }
-      setModalOpen(false); setEditing(null); setFormData({ name: '', description: '', amount: '', is_mandatory: true }); fetchData()
+      setModalOpen(false); setEditing(null); setFormData({ name: '', description: '', amount: '', is_mandatory: true, level: '' }); fetchData()
     } catch (error) { toast.error(error.response?.data?.message || 'Failed') }
   }
 
-  const handleEdit = (item) => { setEditing(item); setFormData({ name: item.name, description: item.description || '', amount: item.amount, is_mandatory: item.is_mandatory }); setModalOpen(true) }
+  const handleEdit = (item) => { setEditing(item); setFormData({ name: item.name, description: item.description || '', amount: item.amount, is_mandatory: item.is_mandatory, level: item.level || '' }); setModalOpen(true) }
   const handleDelete = async (item) => { if (!window.confirm('Delete?')) return; try { await feeTypeApi.delete(item.id); toast.success(t('item_deleted')); fetchData() } catch (error) { toast.error(t('error')) } }
   const handleToggle = async (item) => { try { await feeTypeApi.toggle(item.id); toast.success(t(item.is_active ? 'deactivated' : 'activated')); fetchData() } catch (error) { toast.error(t('error')) } }
 
@@ -45,6 +45,7 @@ export default function FinanceFeeTypes() {
       </div>
     )},
     { header: 'Amount', cell: (row) => <span className="font-semibold text-green-600">{formatCurrency(row.amount)}</span> },
+    { header: 'Level', cell: (row) => row.level ? <span className="badge badge-info">{row.level}</span> : <span className="text-gray-400 text-xs">All levels</span> },
     { header: 'Mandatory', cell: (row) => <span className={`badge ${row.is_mandatory ? 'badge-warning' : 'badge-info'}`}>{row.is_mandatory ? 'Yes' : 'No'}</span> },
     { header: 'Status', cell: (row) => <button onClick={() => handleToggle(row)} className={`badge ${row.is_active ? 'badge-success' : 'badge-danger'}`}>{row.is_active ? 'Active' : 'Inactive'}</button> },
     { header: 'Actions', cell: (row) => (
@@ -68,6 +69,13 @@ export default function FinanceFeeTypes() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="label">Name</label><input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="input" required /></div>
           <div><label className="label">Amount (RWF)</label><input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="input" required min="0" /></div>
+          <div>
+            <label className="label">Level (leave empty for all levels)</label>
+            <select value={formData.level} onChange={(e) => setFormData({...formData, level: e.target.value})} className="input">
+              <option value="">All levels</option>
+              {['L1','L2','L3','M1','M2','D1','D2','D3'].map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
           <div><label className="label">Description</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="input" rows={3} /></div>
           <div className="flex items-center gap-2"><input type="checkbox" checked={formData.is_mandatory} onChange={(e) => setFormData({...formData, is_mandatory: e.target.checked})} className="w-4 h-4 rounded border-gray-300" /><label className="text-sm">Mandatory fee</label></div>
           <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button><button type="submit" className="btn-primary">{editing ? 'Update' : 'Create'}</button></div>

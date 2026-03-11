@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class RegistrarController extends Controller
 {
@@ -26,7 +27,7 @@ class RegistrarController extends Controller
         }
 
         $users = User::where('role', $role)
-            ->select('id', 'first_name', 'last_name', 'email', 'username', 'phone', 'date_of_birth', 'is_active', 'profile_image', 'created_at')
+            ->select('id', 'first_name', 'last_name', 'email', 'username', 'phone', 'date_of_birth', 'is_active', 'status', 'profile_image', 'employee_id', 'created_at')
             ->orderBy('first_name')
             ->get();
 
@@ -57,6 +58,8 @@ class RegistrarController extends Controller
             $profileImagePath = $request->file('profile_image')->store('profile-images', 'public');
         }
 
+        $employeeId = $this->generateEmployeeId($data['role']);
+
         $user = User::create([
             'first_name'    => $data['first_name'],
             'last_name'     => $data['last_name'],
@@ -68,6 +71,7 @@ class RegistrarController extends Controller
             'role'          => $data['role'],
             'profile_image' => $profileImagePath,
             'is_active'     => true,
+            'employee_id'   => $employeeId,
         ]);
 
         ActivityLog::log('user_create', "Registrar created {$data['role']} account: {$user->username}", $request->user());
@@ -142,6 +146,7 @@ class RegistrarController extends Controller
             'phone'         => 'sometimes|nullable|string|max:20',
             'address'       => 'sometimes|nullable|string|max:255',
             'date_of_birth' => 'sometimes|nullable|date',
+            'status'        => 'sometimes|in:active,inactive,on_leave',
             'profile_image' => 'sometimes|nullable|image|max:2048',
         ]);
 
@@ -171,10 +176,34 @@ class RegistrarController extends Controller
 
     // ─── Private helpers ────────────────────────────────────────────────────
 
+    private function generateEmployeeId(string $role): string
+    {
+        $prefixes = [
+            'admin'     => 'ADM',
+            'finance'   => 'FIN',
+            'registrar' => 'REG',
+        ];
+
+        $prefix = $prefixes[$role] ?? 'EMP';
+
+        $last = User::where('role', $role)
+            ->whereNotNull('employee_id')
+            ->orderByDesc('employee_id')
+            ->value('employee_id');
+
+        if ($last && preg_match('/(\d+)$/', $last, $m)) {
+            $next = (int) $m[1] + 1;
+        } else {
+            $next = 1;
+        }
+
+        return $prefix . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+    }
+
     private function authorizeRegistrar(Request $request): void
     {
-        if ($request->user()?->role !== 'registrar') {
-            abort(403, 'Only registrars can perform this action.');
+        if (!in_array($request->user()?->role, ['registrar', 'admin'])) {
+            abort(403, 'Only registrars or admins can perform this action.');
         }
     }
 }

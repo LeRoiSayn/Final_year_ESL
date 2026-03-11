@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
+use App\Models\ClassModel;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 
@@ -40,17 +41,37 @@ class ScheduleController extends Controller
             'final_date' => 'nullable|date',
         ]);
 
-        // Check for conflicts
+        // Check for same-class time conflict
         $conflict = Schedule::where('class_id', $request->class_id)
             ->where('day_of_week', $request->day_of_week)
             ->where(function ($q) use ($request) {
-                $q->whereBetween('start_time', [$request->start_time, $request->end_time])
-                    ->orWhereBetween('end_time', [$request->start_time, $request->end_time]);
+                $q->where('start_time', '<', $request->end_time)
+                  ->where('end_time', '>', $request->start_time);
             })
             ->exists();
 
         if ($conflict) {
-            return $this->error('Schedule conflict detected', 400);
+            return $this->error('Schedule conflict detected for this class', 400);
+        }
+
+        // Check for teacher-level time conflict (teacher cannot teach two classes at the same time)
+        $classModel = ClassModel::find($request->class_id);
+        if ($classModel && $classModel->teacher_id) {
+            $teacherClassIds = ClassModel::where('teacher_id', $classModel->teacher_id)
+                ->where('id', '!=', $request->class_id)
+                ->pluck('id');
+
+            $teacherConflict = Schedule::whereIn('class_id', $teacherClassIds)
+                ->where('day_of_week', $request->day_of_week)
+                ->where(function ($q) use ($request) {
+                    $q->where('start_time', '<', $request->end_time)
+                      ->where('end_time', '>', $request->start_time);
+                })
+                ->exists();
+
+            if ($teacherConflict) {
+                return $this->error('The assigned teacher already has another class scheduled at this time', 400);
+            }
         }
 
         $schedule = Schedule::create($request->all());
@@ -77,6 +98,44 @@ class ScheduleController extends Controller
             'midterm_date' => 'nullable|date',
             'final_date' => 'nullable|date',
         ]);
+
+        $dayOfWeek = $request->day_of_week ?? $schedule->day_of_week;
+        $startTime = $request->start_time ?? $schedule->start_time;
+        $endTime = $request->end_time ?? $schedule->end_time;
+
+        // Check same-class conflict (exclude current schedule)
+        $conflict = Schedule::where('class_id', $schedule->class_id)
+            ->where('id', '!=', $schedule->id)
+            ->where('day_of_week', $dayOfWeek)
+            ->where(function ($q) use ($startTime, $endTime) {
+                $q->where('start_time', '<', $endTime)
+                  ->where('end_time', '>', $startTime);
+            })
+            ->exists();
+
+        if ($conflict) {
+            return $this->error('Schedule conflict detected for this class', 400);
+        }
+
+        // Check teacher-level conflict (exclude current schedule)
+        $classModel = $schedule->class ?? ClassModel::find($schedule->class_id);
+        if ($classModel && $classModel->teacher_id) {
+            $teacherClassIds = ClassModel::where('teacher_id', $classModel->teacher_id)
+                ->where('id', '!=', $schedule->class_id)
+                ->pluck('id');
+
+            $teacherConflict = Schedule::whereIn('class_id', $teacherClassIds)
+                ->where('day_of_week', $dayOfWeek)
+                ->where(function ($q) use ($startTime, $endTime) {
+                    $q->where('start_time', '<', $endTime)
+                      ->where('end_time', '>', $startTime);
+                })
+                ->exists();
+
+            if ($teacherConflict) {
+                return $this->error('The assigned teacher already has another class scheduled at this time', 400);
+            }
+        }
 
         $schedule->update($request->all());
 

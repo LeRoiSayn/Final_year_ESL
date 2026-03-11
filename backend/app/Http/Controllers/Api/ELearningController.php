@@ -234,6 +234,30 @@ class ELearningController extends Controller
     }
 
     /**
+     * Teacher ends (marks as completed) a live online course session.
+     */
+    public function endOnlineCourse(Request $request, $id)
+    {
+        $teacher = $this->getTeacher($request);
+        $course  = OnlineCourse::findOrFail($id);
+
+        if ($course->teacher_id !== $teacher->id) {
+            return response()->json(['error' => 'Accès refusé'], 403);
+        }
+
+        if ($course->status !== 'live') {
+            return response()->json(['error' => 'La session n\'est pas en cours'], 422);
+        }
+
+        $course->update(['status' => 'ended']);
+
+        return response()->json([
+            'message' => 'Session terminée',
+            'course'  => $course->fresh(),
+        ]);
+    }
+
+    /**
      * Teacher updates an online course session.
      */
     public function updateOnlineCourse(Request $request, $id)

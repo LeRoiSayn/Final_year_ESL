@@ -47,6 +47,7 @@ class CourseController extends Controller
             'description' => 'nullable|string',
             'credits' => 'required|integer|min:1|max:30',
             'level' => 'required|in:L1,L2,L3,M1,M2,D1,D2,D3',
+            'course_type' => 'nullable|in:tronc_commun,specialisation',
             'hours_per_week' => 'nullable|integer|min:1|max:20',
         ]);
 
@@ -73,6 +74,7 @@ class CourseController extends Controller
             'description' => 'nullable|string',
             'credits' => 'sometimes|integer|min:1|max:30',
             'level' => 'sometimes|in:L1,L2,L3,M1,M2,D1,D2,D3',
+            'course_type' => 'nullable|in:tronc_commun,specialisation',
             'hours_per_week' => 'nullable|integer|min:1|max:20',
             'is_active' => 'sometimes|boolean',
         ]);

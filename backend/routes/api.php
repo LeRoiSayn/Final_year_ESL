@@ -23,139 +23,252 @@ use App\Http\Controllers\Api\ELearningController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\RegistrarController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SettingsController;
 
-// Public routes
+// ==================== PUBLIC ROUTES ====================
 Route::post('/login', [AuthController::class, 'login']);
-// Public settings (lightweight) for anonymous visitors
 Route::get('/settings/public', [SettingsController::class, 'publicSettings']);
 
-// Protected routes
+// ==================== AUTHENTICATED ROUTES ====================
 Route::middleware('auth:sanctum')->group(function () {
-    // Auth
+
+    // --- Auth (all authenticated users) ---
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/change-password', [AuthController::class, 'changePassword']);
 
-    // Dashboard
-    Route::prefix('dashboard')->group(function () {
-        Route::get('/admin', [DashboardController::class, 'adminStats']);
-        Route::get('/student', [DashboardController::class, 'studentStats']);
-        Route::get('/teacher', [DashboardController::class, 'teacherStats']);
-        Route::get('/finance', [DashboardController::class, 'financeStats']);
-        Route::get('/registrar', [DashboardController::class, 'registrarStats']);
+    // --- Notifications (all authenticated users) ---
+    Route::get('/notifications', [NotificationController::class, 'index']);
+
+    // --- Settings (all authenticated users) ---
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [SettingsController::class, 'getSettings']);
+        Route::put('/', [SettingsController::class, 'updateSettings']);
+        Route::post('/reset', [SettingsController::class, 'resetSettings']);
+        Route::get('/widgets', [SettingsController::class, 'getAvailableWidgets']);
     });
 
-    // Faculties
-    Route::apiResource('faculties', FacultyController::class);
-    Route::post('/faculties/{faculty}/toggle', [FacultyController::class, 'toggle']);
+    // --- Announcements (all authenticated users can read) ---
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::get('/announcements-active', [AnnouncementController::class, 'active']);
+    Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show']);
 
-    // Departments
-    Route::apiResource('departments', DepartmentController::class);
-    Route::post('/departments/{department}/toggle', [DepartmentController::class, 'toggle']);
+    // ==================== DASHBOARDS (role-specific) ====================
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/admin', [DashboardController::class, 'adminStats'])
+            ->middleware('role:admin');
+        Route::get('/student', [DashboardController::class, 'studentStats'])
+            ->middleware('role:student');
+        Route::get('/teacher', [DashboardController::class, 'teacherStats'])
+            ->middleware('role:teacher');
+        Route::get('/finance', [DashboardController::class, 'financeStats'])
+            ->middleware('role:finance');
+        Route::get('/registrar', [DashboardController::class, 'registrarStats'])
+            ->middleware('role:registrar');
+    });
 
-    // Students
-    Route::apiResource('students', StudentController::class);
-    Route::post('/students/{student}/auto-enroll', [StudentController::class, 'autoEnroll']);
-    Route::post('/students/auto-enroll-all', [StudentController::class, 'autoEnrollAll']);
+    // ==================== ACADEMIC READ (admin, registrar, teacher, student) ====================
+    Route::get('/courses', [CourseController::class, 'index']);
+    Route::get('/courses/{course}', [CourseController::class, 'show']);
+    Route::get('/classes', [ClassController::class, 'index']);
+    Route::get('/classes/{class}', [ClassController::class, 'show']);
+    Route::get('/classes/{class}/students', [ClassController::class, 'students']);
+    Route::get('/faculties', [FacultyController::class, 'index']);
+    Route::get('/faculties/{faculty}', [FacultyController::class, 'show']);
+    Route::get('/departments', [DepartmentController::class, 'index']);
+    Route::get('/departments/{department}', [DepartmentController::class, 'show']);
+
+    // Student self-service (students can see their own data)
     Route::get('/students/{student}/courses', [StudentController::class, 'courses']);
     Route::get('/students/{student}/grades', [StudentController::class, 'grades']);
     Route::get('/students/{student}/attendance', [StudentController::class, 'attendance']);
     Route::get('/students/{student}/fees', [StudentController::class, 'fees']);
 
-    // Teachers
-    Route::apiResource('teachers', TeacherController::class);
-    Route::get('/teachers/{teacher}/classes', [TeacherController::class, 'classes']);
-    Route::get('/teachers/{teacher}/students', [TeacherController::class, 'students']);
-
-    // Courses
-    Route::apiResource('courses', CourseController::class);
-    Route::post('/courses/{course}/toggle', [CourseController::class, 'toggle']);
-
-    // Classes
-    Route::apiResource('classes', ClassController::class);
-    Route::get('/classes/{class}/students', [ClassController::class, 'students']);
-    Route::post('/classes/{class}/assign-teacher', [ClassController::class, 'assignTeacher']);
-
-    // Enrollments
-    Route::apiResource('enrollments', EnrollmentController::class);
-    Route::put('/enrollments/{enrollment}/status', [EnrollmentController::class, 'updateStatus']);
-
-    // Grades
-    Route::apiResource('grades', GradeController::class);
-    Route::get('/grades/class/{classId}', [GradeController::class, 'byClass']);
-    Route::post('/grades/bulk', [GradeController::class, 'bulkUpdate']);
-    Route::post('/grades/submit-class/{classId}', [GradeController::class, 'submitToAdmin']);
-
-    // Attendance
-    Route::apiResource('attendance', AttendanceController::class);
-    Route::get('/attendance/class/{classId}', [AttendanceController::class, 'byClass']);
-    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkMark']);
-    Route::get('/attendance/class/{classId}/statistics', [AttendanceController::class, 'statistics']);
-
-    // Fee Types
-    Route::apiResource('fee-types', FeeTypeController::class);
-    Route::post('/fee-types/{feeType}/toggle', [FeeTypeController::class, 'toggle']);
-
-    // Student Fees
-    Route::apiResource('student-fees', StudentFeeController::class);
-    Route::get('/student-fees/student/{studentId}', [StudentFeeController::class, 'byStudent']);
-    Route::post('/student-fees/assign-all', [StudentFeeController::class, 'assignToAll']);
-    Route::put('/student-fees/{studentFee}/installment-plan', [StudentFeeController::class, 'setInstallmentPlan']);
-
-    // Payments
-    Route::apiResource('payments', PaymentController::class);
-    Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt']);
-    Route::get('/payments-today', [PaymentController::class, 'todayCollection']);
-
-    // Schedules
-    Route::apiResource('schedules', ScheduleController::class);
+    // Schedules (read for all roles)
+    Route::get('/schedules', [ScheduleController::class, 'index']);
+    Route::get('/schedules/{schedule}', [ScheduleController::class, 'show']);
     Route::get('/schedules/student/{studentId}', [ScheduleController::class, 'byStudent']);
     Route::get('/schedules/teacher/{teacherId}', [ScheduleController::class, 'byTeacher']);
 
-    // Announcements
-    Route::apiResource('announcements', AnnouncementController::class);
-    Route::get('/announcements-active', [AnnouncementController::class, 'active']);
+    // Grades (read for teacher and admin)
+    Route::get('/grades', [GradeController::class, 'index']);
+    Route::get('/grades/{grade}', [GradeController::class, 'show']);
+    Route::get('/grades/class/{classId}', [GradeController::class, 'byClass']);
 
-    // Activity Logs
-    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
-    Route::get('/activity-logs/actions', [ActivityLogController::class, 'actions']);
-    Route::get('/activity-logs/{activityLog}', [ActivityLogController::class, 'show']);
+    // Attendance (read for teacher and admin)
+    Route::get('/attendance', [AttendanceController::class, 'index']);
+    Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
+    Route::get('/attendance/class/{classId}', [AttendanceController::class, 'byClass']);
+    Route::get('/attendance/class/{classId}/statistics', [AttendanceController::class, 'statistics']);
 
-    // ==================== NEW FEATURES ====================
+    // ==================== ADMIN MANAGEMENT ====================
+    Route::middleware('role:admin')->group(function () {
+        // Faculties & Departments (write)
+        Route::post('/faculties', [FacultyController::class, 'store']);
+        Route::put('/faculties/{faculty}', [FacultyController::class, 'update']);
+        Route::delete('/faculties/{faculty}', [FacultyController::class, 'destroy']);
+        Route::post('/faculties/{faculty}/toggle', [FacultyController::class, 'toggle']);
+        Route::post('/departments', [DepartmentController::class, 'store']);
+        Route::put('/departments/{department}', [DepartmentController::class, 'update']);
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
+        Route::post('/departments/{department}/toggle', [DepartmentController::class, 'toggle']);
 
-    // Notifications (role-based)
-    Route::get('/notifications', [NotificationController::class, 'index']);
+        // Courses (write)
+        Route::post('/courses', [CourseController::class, 'store']);
+        Route::put('/courses/{course}', [CourseController::class, 'update']);
+        Route::delete('/courses/{course}', [CourseController::class, 'destroy']);
+        Route::post('/courses/{course}/toggle', [CourseController::class, 'toggle']);
 
-    // Chatbot AI with role-based access
+        // Classes (write)
+        Route::post('/classes', [ClassController::class, 'store']);
+        Route::put('/classes/{class}', [ClassController::class, 'update']);
+        Route::delete('/classes/{class}', [ClassController::class, 'destroy']);
+        Route::post('/classes/{class}/assign-teacher', [ClassController::class, 'assignTeacher']);
+
+        // Schedules (write)
+        Route::post('/schedules', [ScheduleController::class, 'store']);
+        Route::put('/schedules/{schedule}', [ScheduleController::class, 'update']);
+        Route::delete('/schedules/{schedule}', [ScheduleController::class, 'destroy']);
+
+        // Announcements (write - admin only)
+        Route::post('/announcements', [AnnouncementController::class, 'store']);
+        Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update']);
+        Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy']);
+
+        // Activity Logs (admin only)
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+        Route::get('/activity-logs/actions', [ActivityLogController::class, 'actions']);
+        Route::get('/activity-logs/{activityLog}', [ActivityLogController::class, 'show']);
+
+        // Admin Grade Management
+        Route::prefix('admin')->group(function () {
+            Route::get('/students/search', [AdminController::class, 'searchStudents']);
+            Route::get('/students/{id}/details', [AdminController::class, 'getStudentDetails']);
+            Route::get('/grades/overview', [GradeController::class, 'adminOverview']);
+            Route::post('/grades/validate-class/{classId}', [GradeController::class, 'validateClass']);
+            Route::post('/grades/reject-class/{classId}', [GradeController::class, 'rejectClass']);
+            Route::put('/grades/{gradeId}', [AdminController::class, 'updateGrade']);
+            Route::get('/grades/{gradeId}/history', [AdminController::class, 'getGradeHistory']);
+            Route::get('/students/{studentId}/courses', [AdminController::class, 'getStudentCourses']);
+            Route::post('/students/{studentId}/courses', [AdminController::class, 'addStudentCourse']);
+            Route::delete('/students/{studentId}/courses/{courseId}', [AdminController::class, 'removeStudentCourse']);
+            Route::post('/students/{studentId}/equivalences', [AdminController::class, 'addCourseEquivalence']);
+            Route::put('/equivalences/{equivalenceId}/review', [AdminController::class, 'reviewEquivalence']);
+            Route::get('/kpis', [AdminController::class, 'getKPIs']);
+            Route::get('/alerts', [AdminController::class, 'getStudentAlerts']);
+        });
+
+        // Chatbot admin-only routes
+        Route::get('/chatbot/search-student', [ChatbotController::class, 'searchStudent']);
+        Route::get('/chatbot/student/{id}', [ChatbotController::class, 'getStudentDetails']);
+    });
+
+    // ==================== ADMIN + REGISTRAR ====================
+    Route::middleware('role:admin|registrar')->group(function () {
+        // Students CRUD
+        Route::get('/students', [StudentController::class, 'index']);
+        Route::post('/students', [StudentController::class, 'store']);
+        Route::get('/students/{student}', [StudentController::class, 'show']);
+        Route::put('/students/{student}', [StudentController::class, 'update']);
+        Route::delete('/students/{student}', [StudentController::class, 'destroy']);
+        Route::post('/students/{student}/auto-enroll', [StudentController::class, 'autoEnroll']);
+        Route::post('/students/auto-enroll-all', [StudentController::class, 'autoEnrollAll']);
+        Route::post('/students/{student}/promote', [StudentController::class, 'promoteToNextLevel']);
+
+        // Teachers CRUD
+        Route::get('/teachers', [TeacherController::class, 'index']);
+        Route::post('/teachers', [TeacherController::class, 'store']);
+        Route::get('/teachers/{teacher}', [TeacherController::class, 'show']);
+        Route::put('/teachers/{teacher}', [TeacherController::class, 'update']);
+        Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy']);
+        Route::get('/teachers/{teacher}/classes', [TeacherController::class, 'classes']);
+        Route::get('/teachers/{teacher}/students', [TeacherController::class, 'students']);
+
+        // Enrollments
+        Route::get('/enrollments', [EnrollmentController::class, 'index']);
+        Route::post('/enrollments', [EnrollmentController::class, 'store']);
+        Route::get('/enrollments/{enrollment}', [EnrollmentController::class, 'show']);
+        Route::put('/enrollments/{enrollment}', [EnrollmentController::class, 'update']);
+        Route::delete('/enrollments/{enrollment}', [EnrollmentController::class, 'destroy']);
+        Route::put('/enrollments/{enrollment}/status', [EnrollmentController::class, 'updateStatus']);
+    });
+
+    // ==================== ADMIN + TEACHER (Grades & Attendance write) ====================
+    Route::middleware('role:admin|teacher')->group(function () {
+        Route::post('/grades', [GradeController::class, 'store']);
+        Route::put('/grades/{grade}', [GradeController::class, 'update']);
+        Route::delete('/grades/{grade}', [GradeController::class, 'destroy']);
+        Route::post('/grades/bulk', [GradeController::class, 'bulkUpdate']);
+        Route::post('/grades/submit-class/{classId}', [GradeController::class, 'submitToAdmin']);
+        Route::post('/attendance', [AttendanceController::class, 'store']);
+        Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
+        Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+        Route::post('/attendance/bulk', [AttendanceController::class, 'bulkMark']);
+    });
+
+    // ==================== ADMIN + FINANCE ====================
+    Route::middleware('role:admin|finance')->group(function () {
+        // Fee Types
+        Route::get('/fee-types', [FeeTypeController::class, 'index']);
+        Route::post('/fee-types', [FeeTypeController::class, 'store']);
+        Route::get('/fee-types/{feeType}', [FeeTypeController::class, 'show']);
+        Route::put('/fee-types/{feeType}', [FeeTypeController::class, 'update']);
+        Route::delete('/fee-types/{feeType}', [FeeTypeController::class, 'destroy']);
+        Route::post('/fee-types/{feeType}/toggle', [FeeTypeController::class, 'toggle']);
+
+        // Student Fees
+        Route::get('/student-fees', [StudentFeeController::class, 'index']);
+        Route::post('/student-fees', [StudentFeeController::class, 'store']);
+        Route::get('/student-fees/{studentFee}', [StudentFeeController::class, 'show']);
+        Route::put('/student-fees/{studentFee}', [StudentFeeController::class, 'update']);
+        Route::delete('/student-fees/{studentFee}', [StudentFeeController::class, 'destroy']);
+        Route::get('/student-fees/student/{studentId}', [StudentFeeController::class, 'byStudent']);
+        Route::post('/student-fees/assign-all', [StudentFeeController::class, 'assignToAll']);
+        Route::put('/student-fees/{studentFee}/installment-plan', [StudentFeeController::class, 'setInstallmentPlan']);
+
+        // Payments (finance management)
+        Route::get('/payments', [PaymentController::class, 'index']);
+        Route::post('/payments', [PaymentController::class, 'store']);
+        Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+        Route::put('/payments/{payment}', [PaymentController::class, 'update']);
+        Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
+        Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt']);
+        Route::get('/payments-today', [PaymentController::class, 'todayCollection']);
+    });
+
+    // ==================== STUDENT PAYMENTS ====================
+    Route::middleware('role:student')->prefix('payment')->group(function () {
+        Route::get('/summary', [PaymentController::class, 'getFeeSummary']);
+        Route::get('/history', [PaymentController::class, 'getPaymentHistory']);
+        Route::post('/initialize', [PaymentController::class, 'initializePayment']);
+        Route::get('/status/{reference}', [PaymentController::class, 'checkPaymentStatus']);
+        Route::get('/receipt/{paymentId}', [PaymentController::class, 'downloadReceipt']);
+    });
+
+    // ==================== CHATBOT (all authenticated) ====================
     Route::prefix('chatbot')->group(function () {
         Route::post('/', [ChatbotController::class, 'chat']);
         Route::get('/history', [ChatbotController::class, 'getHistory']);
-        Route::get('/search-student', [ChatbotController::class, 'searchStudent']); // Admin only
-        Route::get('/student/{id}', [ChatbotController::class, 'getStudentDetails']); // Admin only
+        // Admin-only routes are declared above in the admin middleware group
     });
 
-    // E-Learning Platform
+    // ==================== E-LEARNING PLATFORM ====================
     Route::prefix('elearning')->group(function () {
         // Teacher's classes/courses
         Route::get('/teacher/classes', [ELearningController::class, 'getTeacherClasses']);
-
-        // Online Courses
         Route::get('/courses/teacher', [ELearningController::class, 'getTeacherCourses']);
         Route::get('/courses/student', [ELearningController::class, 'getStudentCourses']);
         Route::post('/courses', [ELearningController::class, 'createOnlineCourse']);
         Route::post('/courses/{id}/join', [ELearningController::class, 'joinOnlineCourse']);
         Route::post('/courses/{id}/leave', [ELearningController::class, 'leaveOnlineCourse']);
         Route::post('/courses/{id}/start', [ELearningController::class, 'startOnlineCourse']);
+        Route::post('/courses/{id}/end', [ELearningController::class, 'endOnlineCourse']);
         Route::put('/courses/{id}', [ELearningController::class, 'updateOnlineCourse']);
-
-        // Course Materials
         Route::post('/materials', [ELearningController::class, 'uploadMaterial']);
         Route::get('/materials/course/{courseId}', [ELearningController::class, 'getCourseMaterials']);
         Route::get('/materials/{id}/download', [ELearningController::class, 'downloadMaterial']);
         Route::delete('/materials/{id}', [ELearningController::class, 'deleteMaterial']);
-
-        // Quizzes
         Route::post('/quizzes', [ELearningController::class, 'createQuiz']);
         Route::get('/quizzes/course/{courseId}', [ELearningController::class, 'getCourseQuizzes']);
         Route::post('/quizzes/{id}/start', [ELearningController::class, 'startQuiz']);
@@ -164,8 +277,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/quizzes/{id}', [ELearningController::class, 'deleteQuiz']);
         Route::post('/quizzes/attempt/{attemptId}/submit', [ELearningController::class, 'submitQuiz']);
         Route::post('/quizzes/attempt/{attemptId}/tab-switch', [ELearningController::class, 'reportTabSwitch']);
-
-        // Assignments
         Route::post('/assignments', [ELearningController::class, 'createAssignment']);
         Route::get('/assignments/course/{courseId}', [ELearningController::class, 'getCourseAssignments']);
         Route::post('/assignments/{id}/submit', [ELearningController::class, 'submitAssignment']);
@@ -176,89 +287,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/assignments/submission/{submissionId}/download', [ELearningController::class, 'downloadSubmission']);
     });
 
-    // Admin Management
-    Route::prefix('admin')->middleware('role:admin')->group(function () {
-        // Student Search & Management
-        Route::get('/students/search', [AdminController::class, 'searchStudents']);
-        Route::get('/students/{id}/details', [AdminController::class, 'getStudentDetails']);
-        
-        // Grade Management
-        Route::get('/grades/overview', [GradeController::class, 'adminOverview']);
-        Route::post('/grades/validate-class/{classId}', [GradeController::class, 'validateClass']);
-        Route::post('/grades/reject-class/{classId}', [GradeController::class, 'rejectClass']);
-        Route::put('/grades/{gradeId}', [AdminController::class, 'updateGrade']);
-        Route::get('/grades/{gradeId}/history', [AdminController::class, 'getGradeHistory']);
-        
-        // Course Management for Students
-        Route::get('/students/{studentId}/courses', [AdminController::class, 'getStudentCourses']);
-        Route::post('/students/{studentId}/courses', [AdminController::class, 'addStudentCourse']);
-        Route::delete('/students/{studentId}/courses/{courseId}', [AdminController::class, 'removeStudentCourse']);
-        
-        // Course Equivalences
-        Route::post('/students/{studentId}/equivalences', [AdminController::class, 'addCourseEquivalence']);
-        Route::put('/equivalences/{equivalenceId}/review', [AdminController::class, 'reviewEquivalence']);
-        
-        // Analytics
-        Route::get('/kpis', [AdminController::class, 'getKPIs']);
-        Route::get('/alerts', [AdminController::class, 'getStudentAlerts']);
-    });
+    // ==================== UNIFIED MANAGEMENT (Admin only) ====================
+    Route::middleware('role:admin')->group(function () {
+        Route::prefix('student-management')->group(function () {
+            Route::get('/{student}/profile', [StudentController::class, 'getFullProfile']);
+            Route::get('/{student}/available-courses', [StudentController::class, 'getAvailableCourses']);
+            Route::get('/{student}/enrollment-history', [StudentController::class, 'getEnrollmentHistory']);
+            Route::post('/{student}/assign-course', [StudentController::class, 'assignCourse']);
+            Route::post('/{student}/bulk-assign-courses', [StudentController::class, 'bulkAssignCourses']);
+            Route::delete('/{student}/remove-course/{enrollmentId}', [StudentController::class, 'removeCourse']);
+        });
 
-    // Online Payments
-    Route::prefix('payment')->group(function () {
-        Route::get('/summary', [PaymentController::class, 'getFeeSummary']);
-        Route::get('/history', [PaymentController::class, 'getPaymentHistory']);
-        Route::post('/initialize', [PaymentController::class, 'initializePayment']);
-        Route::get('/status/{reference}', [PaymentController::class, 'checkPaymentStatus']);
-        Route::get('/receipt/{paymentId}', [PaymentController::class, 'downloadReceipt']);
-    });
-
-    // User Settings & Personalization
-    Route::prefix('settings')->group(function () {
-        Route::get('/', [SettingsController::class, 'getSettings']);
-        Route::put('/', [SettingsController::class, 'updateSettings']);
-        Route::post('/reset', [SettingsController::class, 'resetSettings']);
-        Route::get('/widgets', [SettingsController::class, 'getAvailableWidgets']);
-    });
-});
-
-// Payment Webhook (for external payment providers)
-Route::post('/payment/webhook', [PaymentController::class, 'confirmPayment']);
-
-// ==================== UNIFIED MANAGEMENT MODULES (ADDITIVE) ====================
-
-Route::middleware('auth:sanctum')->group(function () {
-    
-    // Unified Student Management (Admin)
-    Route::prefix('student-management')->group(function () {
-        // Full profile view with all details
-        Route::get('/{student}/profile', [StudentController::class, 'getFullProfile']);
-        
-        // Course management for students (transfer students use case)
-        Route::get('/{student}/available-courses', [StudentController::class, 'getAvailableCourses']);
-        Route::get('/{student}/enrollment-history', [StudentController::class, 'getEnrollmentHistory']);
-        Route::post('/{student}/assign-course', [StudentController::class, 'assignCourse']);
-        Route::post('/{student}/bulk-assign-courses', [StudentController::class, 'bulkAssignCourses']);
-        Route::delete('/{student}/remove-course/{enrollmentId}', [StudentController::class, 'removeCourse']);
-    });
-
-    // Unified Teacher Management (Admin)
-    Route::prefix('teacher-management')->group(function () {
-        // Full profile view with all details
-        Route::get('/{teacher}/profile', [TeacherController::class, 'getFullProfile']);
-        
-        // Course assignment management (Admin controlled)
-        Route::get('/{teacher}/available-courses', [TeacherController::class, 'getAvailableCourses']);
-        Route::get('/{teacher}/assigned-courses', [TeacherController::class, 'getAssignedCourses']);
-        Route::get('/{teacher}/workload', [TeacherController::class, 'getWorkload']);
-        Route::post('/{teacher}/assign-course', [TeacherController::class, 'assignCourse']);
-        Route::post('/{teacher}/bulk-assign-courses', [TeacherController::class, 'bulkAssignCourses']);
-        Route::delete('/{teacher}/remove-course/{classId}', [TeacherController::class, 'removeCourse']);
+        Route::prefix('teacher-management')->group(function () {
+            Route::get('/{teacher}/profile', [TeacherController::class, 'getFullProfile']);
+            Route::get('/{teacher}/available-courses', [TeacherController::class, 'getAvailableCourses']);
+            Route::get('/{teacher}/assigned-courses', [TeacherController::class, 'getAssignedCourses']);
+            Route::get('/{teacher}/workload', [TeacherController::class, 'getWorkload']);
+            Route::post('/{teacher}/assign-course', [TeacherController::class, 'assignCourse']);
+            Route::post('/{teacher}/bulk-assign-courses', [TeacherController::class, 'bulkAssignCourses']);
+            Route::delete('/{teacher}/remove-course/{classId}', [TeacherController::class, 'removeCourse']);
+        });
     });
 });
 
 // ==================== REGISTRAR USER MANAGEMENT ====================
-
-Route::middleware('auth:sanctum')->prefix('registrar')->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin|registrar'])->prefix('registrar')->group(function () {
     Route::get('/users', [RegistrarController::class, 'listUsers']);
     Route::post('/users', [RegistrarController::class, 'createUser']);
     Route::delete('/users/{id}', [RegistrarController::class, 'deleteUser']);
@@ -266,3 +319,6 @@ Route::middleware('auth:sanctum')->prefix('registrar')->group(function () {
     Route::put('/users/{id}/profile', [RegistrarController::class, 'updateUserProfile']);
     Route::post('/users/{id}/profile', [RegistrarController::class, 'updateUserProfile']);
 });
+
+// ==================== PAYMENT WEBHOOK (External providers - no auth) ====================
+Route::post('/payment/webhook', [PaymentController::class, 'confirmPayment']);

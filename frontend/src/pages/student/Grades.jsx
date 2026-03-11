@@ -34,20 +34,27 @@ export default function StudentGrades() {
   }
 
   const handlePrint = () => {
-    // Group ALL enrolled courses by academic year + semester (grades optional)
+    // Group ALL courses by level → semester (for a proper academic transcript)
+    const SEM_LABELS = { '1': 'Semestre 1', '2': 'Semestre 2', '3': "Semestre d'été / Rattrapage" }
+    const LEVEL_ORDER = ['L1','L2','L3','M1','M2','D1','D2','D3']
     const grouped = {}
     enrollments.forEach(e => {
-      const year = e.class?.academic_year || 'Année inconnue'
-      const sem = e.class?.semester || 'Semestre inconnu'
-      if (!grouped[year]) grouped[year] = {}
-      if (!grouped[year][sem]) grouped[year][sem] = []
-      grouped[year][sem].push(e)
+      const level = e.class?.course?.level || 'Niveau inconnu'
+      const sem = e.class?.semester || '?'
+      if (!grouped[level]) grouped[level] = {}
+      if (!grouped[level][sem]) grouped[level][sem] = []
+      grouped[level][sem].push(e)
     })
 
     let tableBody = ''
-    Object.entries(grouped).sort().forEach(([year, semesters]) => {
-      Object.entries(semesters).sort().forEach(([sem, courses]) => {
-        tableBody += `<tr class="section-row"><td colspan="9">${year} — ${sem}</td></tr>`
+    const sortedLevels = Object.keys(grouped).sort((a, b) => {
+      const ia = LEVEL_ORDER.indexOf(a), ib = LEVEL_ORDER.indexOf(b)
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+    })
+    sortedLevels.forEach(level => {
+      Object.entries(grouped[level]).sort(([a], [b]) => a.localeCompare(b)).forEach(([sem, courses]) => {
+        const semLabel = SEM_LABELS[sem] || `Semestre ${sem}`
+        tableBody += `<tr class="section-row"><td colspan="9">${level} — ${semLabel}</td></tr>`
         courses.forEach(e => {
           const g = e.grades?.[0]
           const hasGrade = g && g.final_grade != null

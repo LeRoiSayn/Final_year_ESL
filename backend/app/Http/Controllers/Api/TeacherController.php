@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Models\ActivityLog;
+use App\Models\ClassModel;
+use App\Models\Enrollment;
+use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -133,12 +136,17 @@ class TeacherController extends Controller
             'specialization' => 'nullable|string|max:255',
             'salary' => 'nullable|numeric|min:0',
             'status' => 'sometimes|in:active,inactive,on_leave',
+            'password' => 'sometimes|nullable|string|min:6',
         ]);
 
         DB::beginTransaction();
         try {
             // Update user
-            $teacher->user->update($request->only(['first_name', 'last_name', 'phone', 'address', 'date_of_birth', 'gender']));
+            $userFields = $request->only(['first_name', 'last_name', 'phone', 'address', 'date_of_birth', 'gender']);
+            if (!empty($request->password)) {
+                $userFields['password'] = Hash::make($request->password);
+            }
+            $teacher->user->update($userFields);
 
             // Update teacher
             $teacher->update($request->only([
@@ -275,7 +283,7 @@ class TeacherController extends Controller
         $request->validate([
             'course_id' => 'required|exists:courses,id',
             'academic_year' => 'nullable|string',
-            'semester' => 'nullable|in:1,2',
+            'semester' => 'nullable|in:1,2,3',
             'section' => 'nullable|string|max:10',
             'room' => 'nullable|string|max:50',
             'capacity' => 'nullable|integer|min:1|max:500',
@@ -287,38 +295,70 @@ class TeacherController extends Controller
         $semester = $request->semester ?? ($course->semester ?? ($month >= 9 ? '1' : '2'));
         $section = $request->section ?? 'A';
 
-        // Check if this course is already assigned to this teacher for this period
-        $existingClass = \App\Models\ClassModel::where('course_id', $course->id)
+        // Check if this course is already assigned to this teacher for this academic year
+        $teacherClass = ClassModel::where('course_id', $course->id)
             ->where('teacher_id', $teacher->id)
             ->where('academic_year', $academicYear)
-            ->where('semester', $semester)
-            ->where('section', $section)
+            ->where('is_active', true)
             ->first();
 
-        if ($existingClass) {
+        if ($teacherClass) {
+            // Teacher already has this course. Check for orphaned classes (students enrolled elsewhere).
+            $orphanedClasses = ClassModel::where('course_id', $course->id)
+                ->where('academic_year', $academicYear)
+                ->where('is_active', true)
+                ->where('id', '!=', $teacherClass->id)
+                ->get();
+
+            if ($orphanedClasses->isNotEmpty()) {
+                DB::beginTransaction();
+                try {
+                    foreach ($orphanedClasses as $orphan) {
+                        // Move enrollments to teacher's class
+                        Enrollment::where('class_id', $orphan->id)
+                            ->update(['class_id' => $teacherClass->id]);
+                        // Move schedules if teacher's class has none yet
+                        if ($teacherClass->schedules()->count() === 0) {
+                            Schedule::where('class_id', $orphan->id)
+                                ->update(['class_id' => $teacherClass->id]);
+                        }
+                        $orphan->update(['is_active' => false]);
+                    }
+                    DB::commit();
+                    ActivityLog::log('class_merge', "Merged {$orphanedClasses->count()} orphaned class(es) into teacher's class for course {$course->name}", $teacher);
+                    return $this->success(
+                        $teacherClass->fresh()->load(['course', 'teacher.user']),
+                        "Enrollments synchronized: {$orphanedClasses->count()} orphaned class(es) merged successfully."
+                    );
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    return $this->error('Failed to merge classes: ' . $e->getMessage(), 500);
+                }
+            }
+
             return $this->error('This course is already assigned to this teacher for the selected period', 422);
         }
 
         DB::beginTransaction();
         try {
-            // Check if this class exists with another teacher or no teacher (NULL)
-            $classWithOtherTeacher = \App\Models\ClassModel::where('course_id', $course->id)
+            // Find any existing class for this course in this academic year (regardless of semester/section)
+            // This ensures teacher assignment links to the same class students are enrolled in
+            $classWithOtherTeacher = ClassModel::where('course_id', $course->id)
                 ->where('academic_year', $academicYear)
-                ->where('semester', $semester)
-                ->where('section', $section)
+                ->where('is_active', true)
                 ->where(function ($q) use ($teacher) {
-                    $q->where('teacher_id', '!=', $teacher->id)
-                      ->orWhereNull('teacher_id');
+                    $q->whereNull('teacher_id')
+                      ->orWhere('teacher_id', '!=', $teacher->id);
                 })
                 ->first();
 
             if ($classWithOtherTeacher) {
-                // Update the existing class to this teacher
+                // Update the existing class to assign this teacher
                 $classWithOtherTeacher->update(['teacher_id' => $teacher->id]);
                 $class = $classWithOtherTeacher;
             } else {
-                // Create new class
-                $class = \App\Models\ClassModel::create([
+                // No existing class — create a new one
+                $class = ClassModel::create([
                     'course_id' => $course->id,
                     'teacher_id' => $teacher->id,
                     'academic_year' => $academicYear,
@@ -402,7 +442,7 @@ class TeacherController extends Controller
             'course_ids' => 'required|array|min:1',
             'course_ids.*' => 'exists:courses,id',
             'academic_year' => 'nullable|string',
-            'semester' => 'nullable|in:1,2',
+            'semester' => 'nullable|in:1,2,3',
         ]);
 
         $academicYear = $request->academic_year ?? (date('Y') . '-' . (date('Y') + 1));

@@ -28,6 +28,7 @@ export default function AdminCourses() {
     description: '',
     credits: '',
     level: '',
+    course_type: 'specialisation',
     hours_per_week: '3',
   })
 
@@ -77,6 +78,7 @@ export default function AdminCourses() {
       description: '',
       credits: '',
       level: '',
+      course_type: 'specialisation',
       hours_per_week: '3',
     })
   }
@@ -90,6 +92,7 @@ export default function AdminCourses() {
       description: course.description || '',
       credits: course.credits.toString(),
       level: course.level,
+      course_type: course.course_type || 'specialisation',
       hours_per_week: course.hours_per_week?.toString() || '3',
     })
     setModalOpen(true)
@@ -138,6 +141,14 @@ export default function AdminCourses() {
     {
       header: t('level'),
       cell: (row) => <span className="badge badge-info">{row.level}</span>,
+    },
+    {
+      header: t('course_type'),
+      cell: (row) => (
+        <span className={`badge ${row.course_type === 'tronc_commun' ? 'badge-warning' : 'badge-info'}`}>
+          {row.course_type === 'tronc_commun' ? t('tronc_commun') : t('specialisation')}
+        </span>
+      ),
     },
     {
       header: t('course_credits'),
@@ -264,6 +275,17 @@ export default function AdminCourses() {
                     {l}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">{t('course_type')}</label>
+              <select
+                value={formData.course_type}
+                onChange={(e) => setFormData({ ...formData, course_type: e.target.value })}
+                className="input"
+              >
+                <option value="specialisation">{t('specialisation')}</option>
+                <option value="tronc_commun">{t('tronc_commun')}</option>
               </select>
             </div>
             <div>

@@ -72,6 +72,7 @@ export const studentApi = {
   delete: (id) => api.delete(`/students/${id}`),
   autoEnroll: (id) => api.post(`/students/${id}/auto-enroll`),
   autoEnrollAll: () => api.post("/students/auto-enroll-all"),
+  promote: (id) => api.post(`/students/${id}/promote`),
   getCourses: (id) => api.get(`/students/${id}/courses`),
   getGrades: (id) => api.get(`/students/${id}/grades`),
   getAttendance: (id) => api.get(`/students/${id}/attendance`),

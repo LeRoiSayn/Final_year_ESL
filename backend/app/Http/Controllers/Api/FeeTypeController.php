@@ -29,6 +29,7 @@ class FeeTypeController extends Controller
             'description' => 'nullable|string',
             'amount' => 'required|numeric|min:0',
             'is_mandatory' => 'boolean',
+            'level' => 'nullable|in:L1,L2,L3,M1,M2,D1,D2,D3',
         ]);
 
         $feeType = FeeType::create($request->all());
@@ -51,6 +52,7 @@ class FeeTypeController extends Controller
             'amount' => 'sometimes|numeric|min:0',
             'is_mandatory' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
+            'level' => 'nullable|in:L1,L2,L3,M1,M2,D1,D2,D3',
         ]);
 
         $oldValues = $feeType->toArray();

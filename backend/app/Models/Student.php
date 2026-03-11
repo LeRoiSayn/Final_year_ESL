@@ -19,10 +19,12 @@ class Student extends Model
         'guardian_phone',
         'guardian_email',
         'status',
+        'retake_courses',
     ];
 
     protected $casts = [
-        'enrollment_date' => 'date',
+        'enrollment_date'  => 'date',
+        'retake_courses'   => 'array',
     ];
 
     public function user()

@@ -11,6 +11,9 @@ import {
   BookOpenIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  ArrowUpCircleIcon,
+  AcademicCapIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 
 const SEMESTER_LABELS = { '1': 'Semestre 1', '2': 'Semestre 2', '3': 'Semestre 3' }
@@ -194,16 +197,40 @@ function YearSection({ yearData, defaultOpen }) {
 }
 
 /** Full transcript modal — Year → Semester → Course hierarchy */
-function StudentProfileModal({ studentId, onClose }) {
+function StudentProfileModal({ studentId, onClose, onPromoted }) {
+  const { t } = useI18n()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [promoting, setPromoting] = useState(false)
+  const [confirmPromote, setConfirmPromote] = useState(false)
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true)
     adminApi.getStudentDetails(studentId)
       .then(res => setData(res.data))
       .catch(() => toast.error(t('error')))
       .finally(() => setLoading(false))
-  }, [studentId])
+  }
+
+  useEffect(() => { loadData() }, [studentId])
+
+  const UNDERGRADUATE_LEVELS = ['L1', 'L2', 'L3']
+  const NEXT_LEVEL = { L1: 'L2', L2: 'L3' }
+
+  const handlePromote = async () => {
+    setPromoting(true)
+    try {
+      const res = await studentApi.promote(studentId)
+      toast.success(res.data.message || 'Promotion réussie')
+      setConfirmPromote(false)
+      loadData()
+      onPromoted?.()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la promotion')
+    } finally {
+      setPromoting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -228,6 +255,12 @@ function StudentProfileModal({ studentId, onClose }) {
   const totalInProgress  = years.reduce((s, y) => s + (y.year_stats?.in_progress ?? 0), 0)
   const totalFailed      = years.reduce((s, y) => s + (y.year_stats?.failed      ?? 0), 0)
 
+  const isUndergraduate  = UNDERGRADUATE_LEVELS.includes(student.level)
+  const isGraduated      = student.status === 'graduated'
+  const nextLevel        = NEXT_LEVEL[student.level]
+  const isL3Complete     = student.level === 'L3'
+  const retakeCourses    = student.retake_courses ?? []
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <motion.div
@@ -251,10 +284,74 @@ function StudentProfileModal({ studentId, onClose }) {
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100">
-            <XMarkIcon className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* ── Promote button (undergraduate, non-graduated only) ── */}
+            {isUndergraduate && !isGraduated && (
+              <button
+                onClick={() => setConfirmPromote(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-50 hover:bg-primary-100 dark:bg-primary-900/20 dark:hover:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-sm font-medium transition-colors"
+                title={isL3Complete ? 'Finaliser le cursus licence' : `Promouvoir en ${nextLevel}`}
+              >
+                {isL3Complete
+                  ? <><AcademicCapIcon className="w-4 h-4" /> Finaliser L3</>
+                  : <><ArrowUpCircleIcon className="w-4 h-4" /> → {nextLevel}</>
+                }
+              </button>
+            )}
+            {isGraduated && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-semibold">
+                <AcademicCapIcon className="w-4 h-4" /> Cursus licence terminé
+              </span>
+            )}
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100">
+              <XMarkIcon className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
+
+        {/* ── Promotion confirmation banner ── */}
+        <AnimatePresence>
+          {confirmPromote && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mx-6 mt-4 p-4 rounded-xl border-2 border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/20">
+                <p className="text-sm font-semibold text-primary-800 dark:text-primary-200 mb-1">
+                  {isL3Complete
+                    ? `Confirmer la fin du cursus licence pour ${student.user?.first_name} ${student.user?.last_name} ?`
+                    : `Promouvoir ${student.user?.first_name} ${student.user?.last_name} de ${student.level} vers ${nextLevel} ?`
+                  }
+                </p>
+                <p className="text-xs text-primary-600 dark:text-primary-400 mb-3">
+                  {isL3Complete
+                    ? "L'étudiant sera marqué comme ayant terminé le cursus licence. L'inscription en Master doit se faire séparément."
+                    : "Les cours échoués ou non évalués seront conservés comme cours à repasser. La promotion est définitive."
+                  }
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePromote}
+                    disabled={promoting}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                  >
+                    {promoting ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckCircleIcon className="w-4 h-4" />}
+                    {promoting ? 'En cours...' : 'Confirmer'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmPromote(false)}
+                    disabled={promoting}
+                    className="px-4 py-1.5 rounded-lg border border-gray-300 dark:border-dark-100 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-dark-100 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="p-6 space-y-6">
           {/* ── Stat cards ── */}
@@ -319,6 +416,22 @@ function StudentProfileModal({ studentId, onClose }) {
               À venir
             </span>
           </div>
+
+          {/* ── Retake courses notice ── */}
+          {retakeCourses.length > 0 && (
+            <div className="rounded-xl border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowPathIcon className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                <span className="text-sm font-semibold text-orange-800 dark:text-orange-200">
+                  Cours à repasser ({retakeCourses.length})
+                </span>
+              </div>
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                Ces cours ont été échoués lors d'un niveau précédent et doivent être repassés.
+                Ils seront automatiquement inclus lors de la prochaine inscription.
+              </p>
+            </div>
+          )}
 
           {/* ── Transcript: Year → Semester → Courses ── */}
           <div>
@@ -446,6 +559,7 @@ export default function AdminStudents() {
           <StudentProfileModal
             studentId={selectedStudentId}
             onClose={() => setSelectedStudentId(null)}
+            onPromoted={fetchStudents}
           />
         )}
       </AnimatePresence>

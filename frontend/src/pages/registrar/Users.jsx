@@ -11,7 +11,6 @@ import {
   ShieldCheckIcon,
   CurrencyDollarIcon,
   ClipboardDocumentCheckIcon,
-  KeyIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline'
 import { useI18n } from '../../i18n/index.jsx'
@@ -58,10 +57,7 @@ export default function RegistrarUsers() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [resetModalOpen, setResetModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
-  const [newPassword, setNewPassword] = useState('')
-  const [resetting, setResetting] = useState(false)
   const [formData, setFormData] = useState(emptyForm(roleParam))
   const [editData, setEditData] = useState({})
 
@@ -96,8 +92,9 @@ export default function RegistrarUsers() {
     e.preventDefault()
     try {
       const fd = buildFormData({ ...formData, role: roleParam })
-      await registrarApi.createUser(fd)
-      toast.success(t('user_created_success'))
+      const res = await registrarApi.createUser(fd)
+      const newId = res.data?.data?.employee_id
+      toast.success(newId ? `${t('user_created_success')} — ID: ${newId}` : t('user_created_success'))
       setModalOpen(false)
       resetForm()
       fetchUsers()
@@ -140,34 +137,10 @@ export default function RegistrarUsers() {
       username: user.username || '',
       phone: user.phone || '',
       date_of_birth: user.date_of_birth ? user.date_of_birth.substring(0, 10) : '',
+      status: user.status || 'active',
       password: '',
     })
     setEditModalOpen(true)
-  }
-
-  const openResetModal = (user) => {
-    setSelectedUser(user)
-    setNewPassword('')
-    setResetModalOpen(true)
-  }
-
-  const handleResetPassword = async () => {
-    if (!newPassword || newPassword.length < 8) {
-      toast.error(t('password_min_length'))
-      return
-    }
-    setResetting(true)
-    try {
-      await registrarApi.resetPassword(selectedUser.id, newPassword)
-      toast.success(t('password_reset_success'))
-      setResetModalOpen(false)
-      setSelectedUser(null)
-      setNewPassword('')
-    } catch (error) {
-      toast.error(error.response?.data?.message || t('error'))
-    } finally {
-      setResetting(false)
-    }
   }
 
   const resetForm = () => {
@@ -184,23 +157,27 @@ export default function RegistrarUsers() {
           </div>
           <div>
             <p className="font-medium">{row.first_name} {row.last_name}</p>
-            <p className="text-sm text-gray-500">@{row.username}</p>
+            <p className="text-sm text-gray-500 font-mono">{row.employee_id || `@${row.username}`}</p>
           </div>
         </div>
       ),
+      exportValue: (row) => `${row.first_name} ${row.last_name}`,
     },
     { header: t('email'), accessor: 'email' },
     { header: t('phone'), accessor: (row) => row.phone || '—' },
     {
       header: t('status'),
-      cell: (row) => (
-        <span className={`badge ${row.is_active ? 'badge-success' : 'badge-danger'}`}>
-          {row.is_active ? t('active') : t('inactive')}
-        </span>
-      ),
+      cell: (row) => {
+        const s = row.status || (row.is_active ? 'active' : 'inactive')
+        const cls = s === 'active' ? 'badge-success' : s === 'on_leave' ? 'badge-warning' : 'badge-danger'
+        const label = s === 'on_leave' ? 'On Leave' : s.charAt(0).toUpperCase() + s.slice(1)
+        return <span className={`badge ${cls}`}>{label}</span>
+      },
+      exportValue: (row) => row.status || (row.is_active ? 'active' : 'inactive'),
     },
     {
       header: t('actions'),
+      noExport: true,
       cell: (row) => (
         <div className="flex items-center gap-2">
           <button
@@ -209,13 +186,6 @@ export default function RegistrarUsers() {
             title={t('edit')}
           >
             <PencilIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => openResetModal(row)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-100 text-yellow-600"
-            title={t('reset_password')}
-          >
-            <KeyIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleDelete(row)}
@@ -347,6 +317,14 @@ export default function RegistrarUsers() {
                 onChange={e => setEditData({ ...editData, date_of_birth: e.target.value })} />
             </div>
           </div>
+          <div>
+            <label className="label">{t('status')}</label>
+            <select className="input" value={editData.status} onChange={e => setEditData({ ...editData, status: e.target.value })}>
+              <option value="active">{t('active')}</option>
+              <option value="inactive">{t('inactive')}</option>
+              <option value="on_leave">On Leave</option>
+            </select>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setEditModalOpen(false); setSelectedUser(null) }} className="btn-secondary">{t('cancel')}</button>
             <button type="submit" className="btn-primary">{t('update')}</button>
@@ -354,38 +332,6 @@ export default function RegistrarUsers() {
         </form>
       </Modal>
 
-      {/* Reset Password Modal */}
-      {resetModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white dark:bg-dark-200 rounded-2xl p-6 w-full max-w-md"
-          >
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{t('reset_password')}</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              {t('setting_new_password_for') || 'Setting new password for'} <strong>{selectedUser?.first_name} {selectedUser?.last_name}</strong>
-            </p>
-            <div>
-              <label className="label">{t('new_password') || 'New Password'} (min. 8) *</label>
-              <input
-                type="password"
-                className="input"
-                minLength={8}
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                placeholder={t('enter_new_password') || 'Enter new password'}
-              />
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <button onClick={() => setResetModalOpen(false)} className="btn-secondary">{t('cancel')}</button>
-              <button onClick={handleResetPassword} disabled={resetting} className="btn-primary">
-                {resetting ? t('saving') || 'Saving...' : t('reset_password')}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   )
 }

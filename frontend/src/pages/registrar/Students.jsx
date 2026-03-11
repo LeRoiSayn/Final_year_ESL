@@ -4,10 +4,13 @@ import toast from 'react-hot-toast'
 import { studentApi, departmentApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
-import { PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, TrashIcon, ArrowUpCircleIcon, CheckCircleIcon, PencilIcon } from '@heroicons/react/24/outline'
 import { useI18n } from '../../i18n/index.jsx'
 
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
+const STATUSES = ['active', 'inactive', 'graduated', 'suspended']
+const UNDERGRADUATE_LEVELS = ['L1', 'L2', 'L3']
+const NEXT_LEVEL = { L1: 'L2', L2: 'L3' }
 
 export default function RegistrarStudents() {
   const { t } = useI18n()
@@ -15,9 +18,13 @@ export default function RegistrarStudents() {
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editStudent, setEditStudent] = useState(null)
+  const [editData, setEditData] = useState({})
+  const [promoteStudent, setPromoteStudent] = useState(null)
+  const [promoting, setPromoting] = useState(false)
   const [formData, setFormData] = useState({
-    first_name: '', last_name: '', email: '', username: '', password: '', phone: '', 
-    date_of_birth: '', gender: '', department_id: '', level: 'L1', 
+    first_name: '', last_name: '', email: '', username: '', password: '', phone: '',
+    date_of_birth: '', gender: '', department_id: '', level: 'L1',
     enrollment_date: new Date().toISOString().split('T')[0], guardian_name: '', guardian_phone: ''
   })
 
@@ -34,67 +41,204 @@ export default function RegistrarStudents() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await studentApi.create(formData)
-      toast.success(t('student_auto_enrolled'))
+      const res = await studentApi.create(formData)
+      const newId = res.data?.data?.student_id
+      toast.success(newId ? `${t('student_auto_enrolled')} — ID: ${newId}` : t('student_auto_enrolled'))
       setModalOpen(false)
       setFormData({ first_name: '', last_name: '', email: '', username: '', password: '', phone: '', date_of_birth: '', gender: '', department_id: '', level: 'L1', enrollment_date: new Date().toISOString().split('T')[0], guardian_name: '', guardian_phone: '' })
       fetchData()
     } catch (error) { toast.error(error.response?.data?.message || 'Creation failed') }
   }
 
+  const openEdit = (student) => {
+    setEditStudent(student)
+    setEditData({
+      first_name: student.user?.first_name || '',
+      last_name: student.user?.last_name || '',
+      phone: student.user?.phone || '',
+      date_of_birth: student.user?.date_of_birth ? student.user.date_of_birth.split('T')[0] : '',
+      gender: student.user?.gender || '',
+      department_id: student.department_id || '',
+      level: student.level || '',
+      status: student.status || 'active',
+      guardian_name: student.guardian_name || '',
+      guardian_phone: student.guardian_phone || '',
+      guardian_email: student.guardian_email || '',
+      new_password: '',
+    })
+  }
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const payload = { ...editData }
+      if (editData.new_password) { payload.password = editData.new_password }
+      delete payload.new_password
+      await studentApi.update(editStudent.id, payload)
+      toast.success('Étudiant mis à jour avec succès')
+      setEditStudent(null)
+      fetchData()
+    } catch (error) { toast.error(error.response?.data?.message || t('error')) }
+  }
+
   const handleDelete = async (student) => {
     if (!window.confirm(`Delete ${student.user?.first_name}?`)) return
-    try { await studentApi.delete(student.id); toast.success(t('item_deleted')); fetchData() } 
+    try { await studentApi.delete(student.id); toast.success(t('item_deleted')); fetchData() }
     catch (error) { toast.error(t('error')) }
   }
 
+  const handlePromote = async () => {
+    if (!promoteStudent) return
+    setPromoting(true)
+    try {
+      const res = await studentApi.promote(promoteStudent.id)
+      toast.success(res.data?.message || 'Promotion réussie')
+      setPromoteStudent(null)
+      fetchData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la promotion')
+    } finally {
+      setPromoting(false)
+    }
+  }
+
   const columns = [
-    { header: 'Student', cell: (row) => (
+    { header: 'Étudiant', cell: (row) => (
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-medium">{row.user?.first_name?.[0]}{row.user?.last_name?.[0]}</div>
-        <div><p className="font-medium">{row.user?.first_name} {row.user?.last_name}</p><p className="text-sm text-gray-500">{row.student_id}</p></div>
+        <div><p className="font-medium">{row.user?.first_name} {row.user?.last_name}</p><p className="text-sm text-gray-500 font-mono">{row.student_id}</p></div>
       </div>
-    )},
+    ), exportValue: (row) => `${row.user?.first_name ?? ''} ${row.user?.last_name ?? ''}` },
     { header: 'Email', accessor: (row) => row.user?.email },
-    { header: 'Department', accessor: (row) => row.department?.name },
-    { header: 'Level', cell: (row) => <span className="badge badge-info">{row.level}</span> },
-    { header: 'Status', cell: (row) => <span className={`badge ${row.status === 'active' ? 'badge-success' : 'badge-warning'}`}>{row.status}</span> },
-    { header: 'Actions', cell: (row) => (
-      <button onClick={() => handleDelete(row)} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"><TrashIcon className="w-4 h-4" /></button>
+    { header: 'Département', accessor: (row) => row.department?.name },
+    { header: 'Niveau', cell: (row) => <span className="badge badge-info">{row.level}</span>, exportValue: (row) => row.level },
+    { header: 'Statut', cell: (row) => <span className={`badge ${row.status === 'active' ? 'badge-success' : 'badge-warning'}`}>{row.status}</span>, exportValue: (row) => row.status },
+    { header: 'Actions', noExport: true, cell: (row) => (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => openEdit(row)}
+          className="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600"
+          title="Modifier"
+        >
+          <PencilIcon className="w-4 h-4" />
+        </button>
+        {UNDERGRADUATE_LEVELS.includes(row.level) && row.status !== 'graduated' && (
+          <button
+            onClick={() => setPromoteStudent(row)}
+            className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 text-primary-600"
+            title={row.level === 'L3' ? 'Finaliser cursus licence' : `Promouvoir en ${NEXT_LEVEL[row.level]}`}
+          >
+            <ArrowUpCircleIcon className="w-4 h-4" />
+          </button>
+        )}
+        <button onClick={() => handleDelete(row)} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600" title="Supprimer">
+          <TrashIcon className="w-4 h-4" />
+        </button>
+      </div>
     )},
   ]
 
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div><h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Students</h1><p className="text-gray-500 dark:text-gray-400">Manage student registrations</p></div>
-        <button onClick={() => setModalOpen(true)} className="btn-primary"><PlusIcon className="w-5 h-5 mr-2" />Add Student</button>
+        <div><h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Étudiants</h1><p className="text-gray-500 dark:text-gray-400">Gérer les inscriptions étudiantes</p></div>
+        <button onClick={() => setModalOpen(true)} className="btn-primary"><PlusIcon className="w-5 h-5 mr-2" />Ajouter un étudiant</button>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card">
-        <DataTable columns={columns} data={students} loading={loading} searchPlaceholder="Search students..." />
+        <DataTable columns={columns} data={students} loading={loading} searchPlaceholder="Rechercher un étudiant..." />
       </motion.div>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add New Student" size="xl">
+      {/* Edit Student Modal */}
+      {editStudent && (
+        <Modal isOpen={true} onClose={() => setEditStudent(null)} title={`Modifier — ${editStudent.user?.first_name} ${editStudent.user?.last_name}`} size="xl">
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="label">Prénom</label><input type="text" value={editData.first_name} onChange={(e) => setEditData({...editData, first_name: e.target.value})} className="input" required /></div>
+              <div><label className="label">Nom</label><input type="text" value={editData.last_name} onChange={(e) => setEditData({...editData, last_name: e.target.value})} className="input" required /></div>
+              <div><label className="label">Téléphone</label><input type="tel" value={editData.phone} onChange={(e) => setEditData({...editData, phone: e.target.value})} className="input" /></div>
+              <div><label className="label">Date de naissance</label><input type="date" value={editData.date_of_birth} onChange={(e) => setEditData({...editData, date_of_birth: e.target.value})} className="input" /></div>
+              <div><label className="label">Genre</label><select value={editData.gender} onChange={(e) => setEditData({...editData, gender: e.target.value})} className="input"><option value="">Sélectionner</option><option value="male">Masculin</option><option value="female">Féminin</option></select></div>
+              <div><label className="label">Département</label><select value={editData.department_id} onChange={(e) => setEditData({...editData, department_id: e.target.value})} className="input" required><option value="">Sélectionner</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+              <div><label className="label">Niveau</label><select value={editData.level} onChange={(e) => setEditData({...editData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+              <div><label className="label">Statut</label><select value={editData.status} onChange={(e) => setEditData({...editData, status: e.target.value})} className="input">{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+              <div><label className="label">Nom du tuteur</label><input type="text" value={editData.guardian_name} onChange={(e) => setEditData({...editData, guardian_name: e.target.value})} className="input" /></div>
+              <div><label className="label">Téléphone du tuteur</label><input type="tel" value={editData.guardian_phone} onChange={(e) => setEditData({...editData, guardian_phone: e.target.value})} className="input" /></div>
+              <div className="sm:col-span-2"><label className="label">Email du tuteur</label><input type="email" value={editData.guardian_email} onChange={(e) => setEditData({...editData, guardian_email: e.target.value})} className="input" /></div>
+              <div className="sm:col-span-2"><label className="label">Nouveau mot de passe (laisser vide pour ne pas changer)</label><input type="password" value={editData.new_password} onChange={(e) => setEditData({...editData, new_password: e.target.value})} className="input" minLength={6} placeholder="Min. 6 caractères" /></div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <button type="button" onClick={() => setEditStudent(null)} className="btn-secondary">Annuler</button>
+              <button type="submit" className="btn-primary">Enregistrer</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Promote Confirmation Modal */}
+      {promoteStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-dark-300 rounded-2xl w-full max-w-md p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                <ArrowUpCircleIcon className="w-6 h-6 text-primary-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {promoteStudent.level === 'L3' ? 'Finaliser le cursus licence' : 'Promotion académique'}
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {promoteStudent.user?.first_name} {promoteStudent.user?.last_name} — {promoteStudent.student_id}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+              {promoteStudent.level === 'L3'
+                ? `Confirmer la fin du cursus licence (L3). L'étudiant sera marqué comme diplômé.`
+                : `Promouvoir l'étudiant de ${promoteStudent.level} vers ${NEXT_LEVEL[promoteStudent.level]}.`
+              }
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+              Les cours échoués seront enregistrés comme cours à repasser. L'administrateur devra ensuite inscrire l'étudiant aux cours du prochain niveau.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={handlePromote} disabled={promoting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50">
+                <CheckCircleIcon className="w-4 h-4" />
+                {promoting ? 'En cours...' : 'Confirmer'}
+              </button>
+              <button onClick={() => setPromoteStudent(null)} disabled={promoting} className="px-4 py-2.5 border border-gray-300 dark:border-dark-100 rounded-xl text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-dark-100 transition-colors">
+                Annuler
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Create Student Modal */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Ajouter un étudiant" size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className="label">First Name</label><input type="text" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="input" required /></div>
-            <div><label className="label">Last Name</label><input type="text" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="input" required /></div>
+            <div><label className="label">Prénom</label><input type="text" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="input" required /></div>
+            <div><label className="label">Nom</label><input type="text" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="input" required /></div>
             <div><label className="label">Email</label><input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="input" required /></div>
-            <div><label className="label">Username</label><input type="text" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} className="input" required /></div>
-            <div><label className="label">Password</label><input type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="input" required minLength={6} /></div>
-            <div><label className="label">Phone</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input" /></div>
-            <div><label className="label">Date of Birth</label><input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})} className="input" /></div>
-            <div><label className="label">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input"><option value="">Select</option><option value="male">Male</option><option value="female">Female</option></select></div>
-            <div><label className="label">Department</label><select value={formData.department_id} onChange={(e) => setFormData({...formData, department_id: e.target.value})} className="input" required><option value="">Select</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-            <div><label className="label">Level</label><select value={formData.level} onChange={(e) => setFormData({...formData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-            <div><label className="label">Enrollment Date</label><input type="date" value={formData.enrollment_date} onChange={(e) => setFormData({...formData, enrollment_date: e.target.value})} className="input" required /></div>
-            <div><label className="label">Guardian Name</label><input type="text" value={formData.guardian_name} onChange={(e) => setFormData({...formData, guardian_name: e.target.value})} className="input" /></div>
+            <div><label className="label">Nom d'utilisateur</label><input type="text" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} className="input" required /></div>
+            <div><label className="label">Mot de passe</label><input type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="input" required minLength={6} /></div>
+            <div><label className="label">Téléphone</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input" /></div>
+            <div><label className="label">Date de naissance</label><input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})} className="input" /></div>
+            <div><label className="label">Genre</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input"><option value="">Sélectionner</option><option value="male">Masculin</option><option value="female">Féminin</option></select></div>
+            <div><label className="label">Département</label><select value={formData.department_id} onChange={(e) => setFormData({...formData, department_id: e.target.value})} className="input" required><option value="">Sélectionner</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+            <div><label className="label">Niveau</label><select value={formData.level} onChange={(e) => setFormData({...formData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+            <div><label className="label">Date d'inscription</label><input type="date" value={formData.enrollment_date} onChange={(e) => setFormData({...formData, enrollment_date: e.target.value})} className="input" required /></div>
+            <div><label className="label">Nom du tuteur</label><input type="text" value={formData.guardian_name} onChange={(e) => setFormData({...formData, guardian_name: e.target.value})} className="input" /></div>
           </div>
           <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
-            <p className="text-sm text-primary-700 dark:text-primary-300">ℹ️ The student will be automatically enrolled in all courses for their department and level.</p>
+            <p className="text-sm text-primary-700 dark:text-primary-300">ℹ️ L'étudiant sera automatiquement inscrit à tous les cours de son département et niveau.</p>
           </div>
-          <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button><button type="submit" className="btn-primary">Create Student</button></div>
+          <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Annuler</button><button type="submit" className="btn-primary">Créer l'étudiant</button></div>
         </form>
       </Modal>
     </div>

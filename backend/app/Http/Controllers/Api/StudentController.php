@@ -9,6 +9,8 @@ use App\Models\Course;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
 use App\Models\Teacher;
+use App\Models\FeeType;
+use App\Models\StudentFee;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -149,12 +151,17 @@ class StudentController extends Controller
             'guardian_phone' => 'nullable|string|max:20',
             'guardian_email' => 'nullable|email',
             'status' => 'sometimes|in:active,inactive,graduated,suspended',
+            'password' => 'sometimes|nullable|string|min:6',
         ]);
 
         DB::beginTransaction();
         try {
             // Update user
-            $student->user->update($request->only(['first_name', 'last_name', 'phone', 'address', 'date_of_birth', 'gender']));
+            $userFields = $request->only(['first_name', 'last_name', 'phone', 'address', 'date_of_birth', 'gender']);
+            if (!empty($request->password)) {
+                $userFields['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+            }
+            $student->user->update($userFields);
 
             // Update student
             $student->update($request->only([
@@ -264,7 +271,219 @@ class StudentController extends Controller
             }
         }
 
+        // Enroll in retake courses from previous levels (offered this semester)
+        $retakeCourseIds = $student->retake_courses ?? [];
+        if (!empty($retakeCourseIds)) {
+            $retakeCourses = Course::whereIn('id', $retakeCourseIds)
+                ->where('semester', $currentSemester)
+                ->where('is_active', true)
+                ->get();
+
+            foreach ($retakeCourses as $course) {
+                // Skip if the student already has a passing validated grade for this course
+                $hasPassed = $student->enrollments()
+                    ->whereHas('class', fn($q) => $q->where('course_id', $course->id))
+                    ->whereHas('grades', fn($q) => $q->whereNotNull('validated_at')->where('final_grade', '>=', 50))
+                    ->exists();
+
+                if ($hasPassed) continue;
+
+                // Skip if already enrolled in this course this semester
+                $alreadyEnrolledThisSemester = $student->enrollments()
+                    ->whereHas('class', fn($q) => $q
+                        ->where('course_id', $course->id)
+                        ->where('academic_year', $academicYear)
+                        ->where('semester', $currentSemester))
+                    ->exists();
+
+                if ($alreadyEnrolledThisSemester) continue;
+
+                $class = ClassModel::firstOrCreate(
+                    [
+                        'course_id' => $course->id,
+                        'academic_year' => $academicYear,
+                        'semester' => $currentSemester,
+                        'section' => 'A',
+                    ],
+                    [
+                        'room' => 'TBD',
+                        'capacity' => 50,
+                        'is_active' => true,
+                    ]
+                );
+
+                if (!$class->teacher_id && $departmentTeachers->isNotEmpty()) {
+                    $teacher = $departmentTeachers->sortBy(fn($t) => ClassModel::where('teacher_id', $t->id)->count())->first();
+                    $class->update(['teacher_id' => $teacher->id]);
+                }
+
+                Enrollment::create([
+                    'student_id' => $student->id,
+                    'class_id' => $class->id,
+                    'enrollment_date' => now(),
+                    'status' => 'enrolled',
+                ]);
+                $enrolledCount++;
+            }
+        }
+
         return $enrolledCount;
+    }
+
+    /**
+     * Promote a student to the next undergraduate academic level.
+     *
+     * Rules:
+     *   - L1 → L2, L2 → L3  (always, regardless of failed courses)
+     *   - L3 → mark status as 'graduated' (undergraduate cycle completed)
+     *   - Failed courses are tracked in student.retake_courses
+     *   - Master / Doctorate admission must be done via a separate process
+     */
+    public function promoteToNextLevel(Student $student)
+    {
+        $progressionMap = ['L1' => 'L2', 'L2' => 'L3'];
+
+        if (!isset($progressionMap[$student->level]) && $student->level !== 'L3') {
+            return $this->error(
+                'Level progression is only available for undergraduate levels (L1, L2, L3). ' .
+                "Current level: {$student->level}.",
+                422
+            );
+        }
+
+        if ($student->status === 'graduated') {
+            return $this->error(
+                'This student has already completed the undergraduate cycle and cannot be promoted further.',
+                422
+            );
+        }
+
+        DB::beginTransaction();
+        try {
+            $oldLevel = $student->level;
+
+            // ── Step 1: Identify failed / ungraded courses at the current level ──────
+            // A course is a retake candidate if the student has NO passing validated grade for it.
+            $levelEnrollments = $student->enrollments()
+                ->whereHas('class.course', fn($q) => $q->where('level', $oldLevel))
+                ->with('class:id,course_id')
+                ->get();
+
+            $levelCourseIds = $levelEnrollments
+                ->pluck('class.course_id')
+                ->unique();
+
+            $newRetakeCourseIds = $levelCourseIds->filter(function ($courseId) use ($student) {
+                // Check for any passing validated grade across all enrollments for this course
+                return !$student->enrollments()
+                    ->whereHas('class', fn($q) => $q->where('course_id', $courseId))
+                    ->whereHas('grades', fn($q) => $q
+                        ->whereNotNull('validated_at')
+                        ->where('final_grade', '>=', 50))
+                    ->exists();
+            })->values()->toArray();
+
+            // ── Step 2: Prune previously tracked retakes that have now been passed ──
+            $existingRetakes = $student->retake_courses ?? [];
+            $remainingRetakes = array_filter($existingRetakes, function ($courseId) use ($student) {
+                return !$student->enrollments()
+                    ->whereHas('class', fn($q) => $q->where('course_id', $courseId))
+                    ->whereHas('grades', fn($q) => $q
+                        ->whereNotNull('validated_at')
+                        ->where('final_grade', '>=', 50))
+                    ->exists();
+            });
+
+            // ── Step 3: Merge and deduplicate retake course IDs ──────────────────────
+            $updatedRetakes = array_values(array_unique(
+                array_merge(array_values($remainingRetakes), $newRetakeCourseIds)
+            ));
+
+            // ── Step 4: Mark all current 'enrolled' enrollments as 'completed' ────────
+            // This clears the active course list so the admin can assign new-level courses
+            $student->enrollments()
+                ->where('status', 'enrolled')
+                ->update(['status' => 'completed']);
+
+            // ── Step 5: Apply promotion ───────────────────────────────────────────────
+            if ($oldLevel === 'L3') {
+                // End of undergraduate cycle — mark as graduated
+                $student->retake_courses = $updatedRetakes;
+                $student->status = 'graduated';
+                $student->save();
+
+                ActivityLog::log(
+                    'level_promotion',
+                    "Student {$student->user->full_name} ({$student->student_id}) completed the undergraduate cycle (L3). " .
+                    "Status set to graduated. Retake courses on record: " . count($updatedRetakes) . ".",
+                    $student,
+                    ['level' => 'L3', 'status' => 'active'],
+                    ['level' => 'L3', 'status' => 'graduated', 'retake_courses' => $updatedRetakes]
+                );
+
+                DB::commit();
+
+                $message = "Undergraduate cycle completed. {$student->user->full_name} has been marked as graduated.";
+                if (count($updatedRetakes) > 0) {
+                    $message .= " " . count($updatedRetakes) . " course(s) remain on record as retakes.";
+                }
+
+                return $this->success($student->load(['user', 'department']), $message);
+            }
+
+            // L1 → L2 or L2 → L3
+            $nextLevel = $progressionMap[$oldLevel];
+            $student->level = $nextLevel;
+            $student->retake_courses = $updatedRetakes;
+            $student->save();
+
+            // ── Step 5: Auto-assign fee types for the new level ──────────────────────
+            $currentYear = now()->year;
+            $academicYear = (now()->month >= 9 ? $currentYear : $currentYear - 1) . '-' . (now()->month >= 9 ? $currentYear + 1 : $currentYear);
+            $levelFeeTypes = FeeType::where('is_active', true)
+                ->where('level', $nextLevel)
+                ->get();
+            foreach ($levelFeeTypes as $feeType) {
+                $alreadyAssigned = StudentFee::where('student_id', $student->id)
+                    ->where('fee_type_id', $feeType->id)
+                    ->where('academic_year', $academicYear)
+                    ->exists();
+                if (!$alreadyAssigned) {
+                    StudentFee::create([
+                        'student_id'   => $student->id,
+                        'fee_type_id'  => $feeType->id,
+                        'amount'       => $feeType->amount,
+                        'due_date'     => now()->addMonths(1)->toDateString(),
+                        'academic_year' => $academicYear,
+                        'status'       => 'pending',
+                    ]);
+                }
+            }
+
+            ActivityLog::log(
+                'level_promotion',
+                "Student {$student->user->full_name} ({$student->student_id}) promoted from {$oldLevel} to {$nextLevel}. " .
+                "New retake courses: " . count($newRetakeCourseIds) . ". Total retakes tracked: " . count($updatedRetakes) . ". Fees auto-assigned: {$levelFeeTypes->count()}.",
+                $student,
+                ['level' => $oldLevel, 'retake_courses' => $existingRetakes],
+                ['level' => $nextLevel, 'retake_courses' => $updatedRetakes]
+            );
+
+            DB::commit();
+
+            $message = "Student promoted from {$oldLevel} to {$nextLevel}.";
+            if (count($newRetakeCourseIds) > 0) {
+                $message .= " " . count($newRetakeCourseIds) . " failed course(s) tracked as retakes.";
+            } else {
+                $message .= " All current-level courses passed — no retakes.";
+            }
+
+            return $this->success($student->load(['user', 'department']), $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('Promotion failed: ' . $e->getMessage(), 500);
+        }
     }
 
     public function autoEnrollAll()
@@ -386,7 +605,7 @@ class StudentController extends Controller
             return $enrollment->class->course->credits ?? 0;
         });
 
-        $gradeAverage = $grades->count() > 0 ? $grades->avg('score') : null;
+        $gradeAverage = $grades->count() > 0 ? $grades->avg('final_grade') : null;
 
         return $this->success([
             'student' => $student,
@@ -429,18 +648,32 @@ class StudentController extends Controller
             ->pluck('class.course_id')
             ->unique();
 
-        // Get all active courses from the student's department OR any department
+        $retakeCourseIds = $student->retake_courses ?? [];
+
+        // Get active courses from the student's own department (any type)
+        // OR tronc_commun courses from any department (available to all students)
         $availableCourses = Course::with(['department.faculty'])
             ->where('is_active', true)
             ->whereNotIn('id', $enrolledCourseIds)
+            ->where(function ($q) use ($student) {
+                $q->where('department_id', $student->department_id)
+                  ->orWhere('course_type', 'tronc_commun');
+            })
             ->orderBy('department_id')
             ->orderBy('level')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($course) use ($retakeCourseIds) {
+                $course->is_retake = in_array($course->id, $retakeCourseIds);
+                return $course;
+            })
+            ->sortByDesc('is_retake')
+            ->values();
 
         return $this->success([
             'available_courses' => $availableCourses,
             'enrolled_count' => $enrolledCourseIds->count(),
+            'retake_count' => count($retakeCourseIds),
         ]);
     }
 
@@ -468,24 +701,29 @@ class StudentController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find or create a class for this course using its defined semester
+            // Find or create a class for this course
             $month = (int) date('n');
             $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
-            $courseSemester = $course->semester ?? '1';
+            $courseSemester = $course->semester ?? ($month >= 9 ? '1' : '2');
 
-            $class = ClassModel::firstOrCreate(
-                [
+            // Prefer an existing class that already has a teacher assigned (keeps student+teacher in sync)
+            $class = ClassModel::where('course_id', $course->id)
+                ->where('academic_year', $academicYear)
+                ->where('is_active', true)
+                ->orderByRaw('CASE WHEN teacher_id IS NOT NULL THEN 0 ELSE 1 END')
+                ->first();
+
+            if (!$class) {
+                $class = ClassModel::create([
                     'course_id' => $course->id,
                     'academic_year' => $academicYear,
                     'semester' => $courseSemester,
                     'section' => 'A',
-                ],
-                [
                     'room' => 'TBD',
                     'capacity' => 50,
                     'is_active' => true,
-                ]
-            );
+                ]);
+            }
 
             // Create enrollment
             $enrollment = Enrollment::create([
@@ -596,22 +834,26 @@ class StudentController extends Controller
                     continue;
                 }
 
-                $courseSemester = $course->semester ?? '1';
+                $courseSemester = $course->semester ?? ($month >= 9 ? '1' : '2');
 
-                // Find or create class
-                $class = ClassModel::firstOrCreate(
-                    [
+                // Prefer existing class with teacher assigned (keeps student+teacher in sync)
+                $class = ClassModel::where('course_id', $courseId)
+                    ->where('academic_year', $academicYear)
+                    ->where('is_active', true)
+                    ->orderByRaw('CASE WHEN teacher_id IS NOT NULL THEN 0 ELSE 1 END')
+                    ->first();
+
+                if (!$class) {
+                    $class = ClassModel::create([
                         'course_id' => $courseId,
                         'academic_year' => $academicYear,
                         'semester' => $courseSemester,
                         'section' => 'A',
-                    ],
-                    [
                         'room' => 'TBD',
                         'capacity' => 50,
                         'is_active' => true,
-                    ]
-                );
+                    ]);
+                }
 
                 // Create enrollment
                 Enrollment::create([

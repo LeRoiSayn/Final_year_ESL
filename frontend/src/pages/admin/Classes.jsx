@@ -383,6 +383,7 @@ export default function AdminClasses() {
               >
                 <option value="1">{t('semester_1')}</option>
                 <option value="2">{t('semester_2')}</option>
+                <option value="3">{t('semester_3')}</option>
               </select>
             </div>
           </div>
