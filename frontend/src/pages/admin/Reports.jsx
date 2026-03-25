@@ -44,8 +44,7 @@ export default function AdminReports() {
     try {
       const response = await dashboardApi.getAdminStats()
       setStats(response.data.data)
-    } catch (error) {
-      console.error('Failed to fetch stats:', error)
+    } catch (_) {
     } finally {
       setLoading(false)
     }

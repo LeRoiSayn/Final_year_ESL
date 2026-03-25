@@ -17,20 +17,16 @@ import {
   ChartBarIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
-  ArrowLeftOnRectangleIcon,
+  ArrowRightEndOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
   SunIcon,
   MoonIcon,
   UserCircleIcon,
-  BellIcon,
   ClockIcon,
   UsersIcon,
   DocumentTextIcon,
-  CheckCircleIcon,
   VideoCameraIcon,
-  CreditCardIcon,
-  EnvelopeIcon,
 } from '@heroicons/react/24/outline'
 
 const menuItems = {
@@ -42,8 +38,7 @@ const menuItems = {
     { nameKey: 'menu_classes', path: '/admin/classes', icon: CalendarIcon },
     { nameKey: 'menu_student_management', path: '/admin/student-management', icon: UserGroupIcon },
     { nameKey: 'menu_teacher_management', path: '/admin/teacher-management', icon: UsersIcon },
-    { nameKey: 'menu_auto_enrollment', path: '/admin/enrollment', icon: CheckCircleIcon },
-    { nameKey: 'menu_schedules', path: '/admin/schedules', icon: CalendarIcon },
+{ nameKey: 'menu_schedules', path: '/admin/schedules', icon: CalendarIcon },
     { nameKey: 'menu_reports', path: '/admin/reports', icon: ChartBarIcon },
     { nameKey: 'menu_grades', path: '/admin/grades', icon: AcademicCapIcon },
     { nameKey: 'menu_activity_log', path: '/admin/activity-log', icon: ClockIcon },
@@ -82,18 +77,10 @@ const menuItems = {
     { nameKey: 'menu_attendance', path: '/student/attendance', icon: ClipboardDocumentListIcon },
     { nameKey: 'menu_schedule', path: '/student/schedule', icon: CalendarIcon },
     { nameKey: 'menu_fees', path: '/student/fees', icon: CurrencyDollarIcon },
-    { nameKey: 'menu_payment', path: '/student/payment', icon: CreditCardIcon },
     { nameKey: 'menu_settings', path: '/student/settings', icon: Cog6ToothIcon },
   ],
 }
 
-const roleColors = {
-  admin: 'from-red-500 to-orange-500',
-  registrar: 'from-blue-500 to-cyan-500',
-  finance: 'from-green-500 to-emerald-500',
-  teacher: 'from-purple-500 to-pink-500',
-  student: 'from-primary-500 to-teal-500',
-}
 
 // User Profile Component based on role
 const UserProfileSection = ({ user, role, onLogout, t }) => {
@@ -160,8 +147,8 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
         className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors group"
       >
         {/* Avatar */}
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${roleColors[role]} flex items-center justify-center flex-shrink-0 shadow-md`}>
-          <span className="text-white font-bold text-lg">{getInitials()}</span>
+        <div className="w-10 h-10 rounded-lg bg-gray-800 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+          <span className="text-white font-semibold text-sm">{getInitials()}</span>
         </div>
         
         {/* Info */}
@@ -178,7 +165,7 @@ const UserProfileSection = ({ user, role, onLogout, t }) => {
         onClick={onLogout}
         className="w-full mt-2 flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
       >
-        <ArrowLeftOnRectangleIcon className="w-4 h-4" />
+        <ArrowRightEndOnRectangleIcon className="w-4 h-4" />
         {t('logout')}
       </button>
     </div>
@@ -306,9 +293,9 @@ export default function DashboardLayout() {
                 title={isDark ? t('light_mode') : t('dark_mode')}
               >
                 {isDark ? (
-                  <SunIcon className="w-5 h-5 text-yellow-500" />
+                  <SunIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 ) : (
-                  <MoonIcon className="w-5 h-5 text-gray-600" />
+                  <MoonIcon className="w-5 h-5 text-gray-500" />
                 )}
               </button>
 

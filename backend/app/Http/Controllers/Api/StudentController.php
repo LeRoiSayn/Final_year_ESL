@@ -107,6 +107,9 @@ class StudentController extends Controller
             // Auto-enroll in courses
             $enrolledCount = $this->autoEnrollStudent($student);
 
+            // Auto-assign applicable fee types for the current academic year
+            $this->autoAssignFees($student);
+
             DB::commit();
 
             ActivityLog::log('create', "Created student: {$user->full_name} and auto-enrolled in {$enrolledCount} courses", $student);
@@ -200,19 +203,45 @@ class StudentController extends Controller
         );
     }
 
-    private function autoEnrollStudent(Student $student): int
+    /**
+     * Advance student to the next semester (S1→S2→S3).
+     * S3 is the end of the year; promotion to next level is done separately.
+     */
+    public function advanceSemester(Student $student)
     {
-        // Determine current academic semester (3 semesters per year)
-        // Semester 1: Sep-Dec, Semester 2: Jan-Apr, Semester 3: May-Aug
-        $month = (int) date('n');
-        if ($month >= 9 && $month <= 12) {
-            $currentSemester = '1';
-        } elseif ($month >= 1 && $month <= 4) {
-            $currentSemester = '2';
-        } else {
-            $currentSemester = '3';
+        $current = (string) ($student->current_semester ?? '1');
+
+        if ($current === '3') {
+            return $this->error('Le semestre 3 est le dernier semestre de l\'année. Veuillez utiliser la promotion pour passer à l\'année supérieure.', 422);
         }
 
+        $next = (string) ((int) $current + 1);
+        $student->update(['current_semester' => $next]);
+
+        return $this->success(
+            $student->fresh(['user', 'department']),
+            "Étudiant avancé au semestre {$next}"
+        );
+    }
+
+    private function autoEnrollStudent(Student $student): int
+    {
+        // Use the student's stored current_semester (set explicitly by admin).
+        // Fallback to month-based detection for backward compatibility.
+        if (!empty($student->current_semester)) {
+            $currentSemester = (string) $student->current_semester;
+        } else {
+            $month = (int) date('n');
+            if ($month >= 9 && $month <= 12) {
+                $currentSemester = '1';
+            } elseif ($month >= 1 && $month <= 4) {
+                $currentSemester = '2';
+            } else {
+                $currentSemester = '3';
+            }
+        }
+
+        $month = (int) date('n');
         $academicYear = $month >= 9 ? date('Y') . '-' . (date('Y') + 1) : (date('Y') - 1) . '-' . date('Y');
 
         // Get courses for student's department, level AND current semester
@@ -331,6 +360,52 @@ class StudentController extends Controller
     }
 
     /**
+     * Auto-assign all applicable active fee types to a student for the current academic year.
+     * Fees with level = NULL apply to all students; fees with a specific level only apply
+     * to students at that level. Skips a fee type if it is already assigned for the year.
+     */
+    private function autoAssignFees(Student $student): int
+    {
+        $month = (int) date('n');
+        $academicYear = $month >= 9
+            ? date('Y') . '-' . (date('Y') + 1)
+            : (date('Y') - 1) . '-' . date('Y');
+
+        $dueDate = $month >= 9
+            ? date('Y') . '-12-31'   // Semester 1 → end of December
+            : date('Y') . '-06-30';  // Semester 2/3 → end of June
+
+        $feeTypes = FeeType::where('is_active', true)
+            ->where(function ($q) use ($student) {
+                $q->whereNull('level')
+                  ->orWhere('level', $student->level);
+            })
+            ->get();
+
+        $assigned = 0;
+        foreach ($feeTypes as $feeType) {
+            $exists = StudentFee::where('student_id', $student->id)
+                ->where('fee_type_id', $feeType->id)
+                ->where('academic_year', $academicYear)
+                ->exists();
+
+            if (!$exists) {
+                StudentFee::create([
+                    'student_id'    => $student->id,
+                    'fee_type_id'   => $feeType->id,
+                    'amount'        => $feeType->amount,
+                    'due_date'      => $dueDate,
+                    'academic_year' => $academicYear,
+                    'status'        => 'pending',
+                ]);
+                $assigned++;
+            }
+        }
+
+        return $assigned;
+    }
+
+    /**
      * Promote a student to the next undergraduate academic level.
      *
      * Rules:
@@ -434,36 +509,17 @@ class StudentController extends Controller
             // L1 → L2 or L2 → L3
             $nextLevel = $progressionMap[$oldLevel];
             $student->level = $nextLevel;
+            $student->current_semester = '1'; // Reset to semester 1 for new level
             $student->retake_courses = $updatedRetakes;
             $student->save();
 
-            // ── Step 5: Auto-assign fee types for the new level ──────────────────────
-            $currentYear = now()->year;
-            $academicYear = (now()->month >= 9 ? $currentYear : $currentYear - 1) . '-' . (now()->month >= 9 ? $currentYear + 1 : $currentYear);
-            $levelFeeTypes = FeeType::where('is_active', true)
-                ->where('level', $nextLevel)
-                ->get();
-            foreach ($levelFeeTypes as $feeType) {
-                $alreadyAssigned = StudentFee::where('student_id', $student->id)
-                    ->where('fee_type_id', $feeType->id)
-                    ->where('academic_year', $academicYear)
-                    ->exists();
-                if (!$alreadyAssigned) {
-                    StudentFee::create([
-                        'student_id'   => $student->id,
-                        'fee_type_id'  => $feeType->id,
-                        'amount'       => $feeType->amount,
-                        'due_date'     => now()->addMonths(1)->toDateString(),
-                        'academic_year' => $academicYear,
-                        'status'       => 'pending',
-                    ]);
-                }
-            }
+            // ── Step 5: Auto-assign all applicable fees for the new level ─────────────
+            $feesAssigned = $this->autoAssignFees($student);
 
             ActivityLog::log(
                 'level_promotion',
                 "Student {$student->user->full_name} ({$student->student_id}) promoted from {$oldLevel} to {$nextLevel}. " .
-                "New retake courses: " . count($newRetakeCourseIds) . ". Total retakes tracked: " . count($updatedRetakes) . ". Fees auto-assigned: {$levelFeeTypes->count()}.",
+                "New retake courses: " . count($newRetakeCourseIds) . ". Total retakes tracked: " . count($updatedRetakes) . ". Fees auto-assigned: {$feesAssigned}.",
                 $student,
                 ['level' => $oldLevel, 'retake_courses' => $existingRetakes],
                 ['level' => $nextLevel, 'retake_courses' => $updatedRetakes]
@@ -564,17 +620,31 @@ class StudentController extends Controller
 
     public function fees(Student $student)
     {
-        $fees = $student->fees()
+        $month = (int) date('n');
+        $currentAcademicYear = $month >= 9
+            ? date('Y') . '-' . (date('Y') + 1)
+            : (date('Y') - 1) . '-' . date('Y');
+
+        // Current academic year fees only (for the summary and main display)
+        $currentFees = $student->fees()
             ->with(['feeType', 'payments'])
+            ->where('academic_year', $currentAcademicYear)
             ->get();
 
+        // All historical payments across every year (for the payment history section)
+        $allPayments = \App\Models\Payment::whereHas('studentFee', function ($q) use ($student) {
+            $q->where('student_id', $student->id);
+        })->with(['studentFee.feeType'])->orderByDesc('payment_date')->get();
+
         return $this->success([
-            'fees' => $fees,
-            'summary' => [
-                'total' => $fees->sum('amount'),
-                'paid' => $fees->sum('paid_amount'),
-                'balance' => $fees->sum('balance'),
+            'fees'         => $currentFees,
+            'academic_year' => $currentAcademicYear,
+            'summary'      => [
+                'total'   => $currentFees->sum('amount'),
+                'paid'    => $currentFees->sum('paid_amount'),
+                'balance' => $currentFees->sum(fn ($f) => (float) $f->amount - (float) $f->paid_amount),
             ],
+            'all_payments' => $allPayments,
         ]);
     }
 

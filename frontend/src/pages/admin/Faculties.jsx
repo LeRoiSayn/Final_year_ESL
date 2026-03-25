@@ -122,7 +122,7 @@ export default function AdminFaculties() {
           onClick={() => handleToggle(row)}
           className={`badge ${row.is_active ? 'badge-success' : 'badge-danger'}`}
         >
-          {row.is_active ? 'Active' : 'Inactive'}
+          {row.is_active ? t('active') : t('inactive')}
         </button>
       ),
     },

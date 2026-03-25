@@ -37,18 +37,26 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       const response = await api.post('/login', { username, password })
+      // OTP step required — return the status object to Login.jsx
+      if (response.data?.status === 'otp_required') {
+        return response.data
+      }
+      // Direct login (fallback, should not happen with OTP enabled)
       const { user, token } = response.data.data
-      
       localStorage.setItem('token', token)
       setUser(user)
-      toast.success(`Welcome back, ${user.first_name}!`)
-      
+      toast.success(`Bienvenue, ${user.first_name} !`)
       return user
     } catch (error) {
-      const message = error.response?.data?.message || 'Login failed'
+      const message = error.response?.data?.message || 'Identifiants incorrects'
       toast.error(message)
       throw error
     }
+  }
+
+  // Called after OTP verified — set the user in context
+  const setAuthUser = (user) => {
+    setUser(user)
   }
 
   const logout = async () => {
@@ -99,6 +107,7 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     changePassword,
     checkAuth,
+    setAuthUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

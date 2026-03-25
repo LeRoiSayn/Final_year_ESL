@@ -27,6 +27,10 @@ use App\Http\Controllers\Api\SettingsController;
 
 // ==================== PUBLIC ROUTES ====================
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/verify-login-otp', [AuthController::class, 'verifyLoginOtp']);
+Route::post('/resend-otp', [AuthController::class, 'resendOtp']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::get('/settings/public', [SettingsController::class, 'publicSettings']);
 
 // ==================== AUTHENTICATED ROUTES ====================
@@ -79,11 +83,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments', [DepartmentController::class, 'index']);
     Route::get('/departments/{department}', [DepartmentController::class, 'show']);
 
+    // Student list read (finance needs it to assign/view fees; teachers need it for their classes)
+    Route::get('/students', [StudentController::class, 'index']);
+    Route::get('/students/{student}', [StudentController::class, 'show']);
+
     // Student self-service (students can see their own data)
     Route::get('/students/{student}/courses', [StudentController::class, 'courses']);
     Route::get('/students/{student}/grades', [StudentController::class, 'grades']);
     Route::get('/students/{student}/attendance', [StudentController::class, 'attendance']);
     Route::get('/students/{student}/fees', [StudentController::class, 'fees']);
+
+    // Teachers (read for all authenticated roles — teachers need to see their own classes)
+    Route::get('/teachers/{teacher}/classes', [TeacherController::class, 'classes']);
+    Route::get('/teachers/{teacher}/students', [TeacherController::class, 'students']);
 
     // Schedules (read for all roles)
     Route::get('/schedules', [ScheduleController::class, 'index']);
@@ -153,6 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/students/{studentId}/courses', [AdminController::class, 'getStudentCourses']);
             Route::post('/students/{studentId}/courses', [AdminController::class, 'addStudentCourse']);
             Route::delete('/students/{studentId}/courses/{courseId}', [AdminController::class, 'removeStudentCourse']);
+            Route::post('/students/{studentId}/transfer-grade', [AdminController::class, 'addTransferGrade']);
             Route::post('/students/{studentId}/equivalences', [AdminController::class, 'addCourseEquivalence']);
             Route::put('/equivalences/{equivalenceId}/review', [AdminController::class, 'reviewEquivalence']);
             Route::get('/kpis', [AdminController::class, 'getKPIs']);
@@ -166,15 +179,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ==================== ADMIN + REGISTRAR ====================
     Route::middleware('role:admin|registrar')->group(function () {
-        // Students CRUD
-        Route::get('/students', [StudentController::class, 'index']);
+        // Students CRUD (GET index/show are in ACADEMIC READ — accessible to all roles)
         Route::post('/students', [StudentController::class, 'store']);
-        Route::get('/students/{student}', [StudentController::class, 'show']);
         Route::put('/students/{student}', [StudentController::class, 'update']);
         Route::delete('/students/{student}', [StudentController::class, 'destroy']);
         Route::post('/students/{student}/auto-enroll', [StudentController::class, 'autoEnroll']);
         Route::post('/students/auto-enroll-all', [StudentController::class, 'autoEnrollAll']);
         Route::post('/students/{student}/promote', [StudentController::class, 'promoteToNextLevel']);
+        Route::post('/students/{student}/advance-semester', [StudentController::class, 'advanceSemester']);
 
         // Teachers CRUD
         Route::get('/teachers', [TeacherController::class, 'index']);
@@ -182,8 +194,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/teachers/{teacher}', [TeacherController::class, 'show']);
         Route::put('/teachers/{teacher}', [TeacherController::class, 'update']);
         Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy']);
-        Route::get('/teachers/{teacher}/classes', [TeacherController::class, 'classes']);
-        Route::get('/teachers/{teacher}/students', [TeacherController::class, 'students']);
 
         // Enrollments
         Route::get('/enrollments', [EnrollmentController::class, 'index']);

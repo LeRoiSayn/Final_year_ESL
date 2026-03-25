@@ -17,6 +17,7 @@ import {
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
 import { useI18n } from '../../i18n/index.jsx'
+import { useWidgetSettings } from '../../hooks/useWidgetSettings'
 import {
   UserGroupIcon,
   UsersIcon,
@@ -40,6 +41,7 @@ ChartJS.register(
 
 export default function AdminDashboard() {
   const { t } = useI18n()
+  const showWidget = useWidgetSettings()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -51,8 +53,7 @@ export default function AdminDashboard() {
     try {
       const response = await dashboardApi.getAdminStats()
       setStats(response.data.data)
-    } catch (error) {
-      console.error('Failed to fetch stats:', error)
+    } catch (_) {
     } finally {
       setLoading(false)
     }
@@ -150,131 +151,58 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title={t('total_students')}
-          value={stats?.stats?.total_students || 0}
-          icon={UserGroupIcon}
-          color="primary"
-          delay={0}
-        />
-        <StatCard
-          title={t('total_teachers')}
-          value={stats?.stats?.total_teachers || 0}
-          icon={UsersIcon}
-          color="blue"
-          delay={0.1}
-        />
-        <StatCard
-          title={t('total_courses')}
-          value={stats?.stats?.total_courses || 0}
-          icon={BookOpenIcon}
-          color="purple"
-          delay={0.2}
-        />
-        <StatCard
-          title={t('total_departments')}
-          value={stats?.stats?.total_departments || 0}
-          icon={BuildingLibraryIcon}
-          color="orange"
-          delay={0.3}
-        />
-      </div>
+      {showWidget('stats') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard title={t('total_students')} value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" delay={0} />
+          <StatCard title={t('total_teachers')} value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.1} />
+          <StatCard title={t('total_courses')} value={stats?.stats?.total_courses || 0} icon={BookOpenIcon} color="purple" delay={0.2} />
+          <StatCard title={t('total_departments')} value={stats?.stats?.total_departments || 0} icon={BuildingLibraryIcon} color="orange" delay={0.3} />
+        </div>
+      )}
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Enrollment Trends */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="card p-6"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {t('enrollment_trends')}
-          </h3>
-          <div className="h-64">
-            <Line data={enrollmentChartData} options={chartOptions} />
-          </div>
-        </motion.div>
+      {showWidget('recent_activity') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('enrollment_trends')}</h3>
+            <div className="h-64"><Line data={enrollmentChartData} options={chartOptions} /></div>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('students_by_department')}</h3>
+            <div className="h-64 flex items-center justify-center">
+              <Doughnut data={departmentChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
+            </div>
+          </motion.div>
+        </div>
+      )}
 
-        {/* Students by Department */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="card p-6"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {t('students_by_department')}
-          </h3>
-          <div className="h-64 flex items-center justify-center">
-            <Doughnut
-              data={departmentChartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: 'bottom',
-                  },
-                },
-              }}
-            />
-          </div>
-        </motion.div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Students by Level */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="card p-6 lg:col-span-2"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {t('students_by_level')}
-          </h3>
-          <div className="h-64">
-            <Bar data={levelChartData} options={chartOptions} />
-          </div>
-        </motion.div>
-
-        {/* Recent Students */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="card p-6"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Recent Students
-          </h3>
-          <div className="space-y-4">
-            {stats?.recent_students?.map((student) => (
-              <div
-                key={student.id}
-                className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-medium">
-                  {student.user?.first_name?.[0]}{student.user?.last_name?.[0]}
+      {showWidget('recent_activity') && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6 lg:col-span-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('students_by_level')}</h3>
+            <div className="h-64"><Bar data={levelChartData} options={chartOptions} /></div>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="card p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Students</h3>
+            <div className="space-y-4">
+              {stats?.recent_students?.map((student) => (
+                <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-medium">
+                    {student.user?.first_name?.[0]}{student.user?.last_name?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-white truncate">{student.user?.first_name} {student.user?.last_name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{student.department?.name} - {student.level}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">
-                    {student.user?.first_name} {student.user?.last_name}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {student.department?.name} - {student.level}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Quick Actions */}
+      {showWidget('quick_actions') && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -286,14 +214,14 @@ export default function AdminDashboard() {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <a
-            href="/admin/students"
+            href="/admin/student-management"
             className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group"
           >
             <UserGroupIcon className="w-8 h-8 mx-auto mb-2 text-primary-500 group-hover:scale-110 transition-transform" />
             <p className="font-medium text-gray-900 dark:text-white">View Students</p>
           </a>
           <a
-            href="/admin/teachers"
+            href="/admin/teacher-management"
             className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300 hover:bg-gray-100 dark:hover:bg-dark-100 transition-colors text-center group"
           >
             <UsersIcon className="w-8 h-8 mx-auto mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
@@ -315,6 +243,7 @@ export default function AdminDashboard() {
           </a>
         </div>
       </motion.div>
+      )}
     </div>
   )
 }

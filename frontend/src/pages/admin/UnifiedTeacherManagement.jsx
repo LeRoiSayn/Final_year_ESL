@@ -86,8 +86,7 @@ export default function UnifiedTeacherManagement() {
     try {
       const response = await departmentApi.getAll()
       setDepartments(response.data.data?.data || response.data.data || [])
-    } catch (error) {
-      console.error('Failed to fetch departments:', error)
+    } catch (_) {
     }
   }
 

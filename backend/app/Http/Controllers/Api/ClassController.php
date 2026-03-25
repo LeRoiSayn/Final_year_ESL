@@ -103,12 +103,15 @@ class ClassController extends Controller
 
     public function destroy(ClassModel $class)
     {
-        if ($class->enrollments()->count() > 0) {
-            return $this->error('Cannot delete class with enrollments', 400);
+        if ($class->enrollments()->where('status', 'enrolled')->count() > 0) {
+            return $this->error('Cannot delete class with active enrollments', 400);
         }
 
+        // Remove non-active enrollments (dropped, completed, transfer) before deleting
+        $class->enrollments()->whereIn('status', ['dropped', 'completed', 'transfer'])->delete();
+
         ActivityLog::log('delete', "Deleted class: {$class->course->code} - {$class->section}", $class);
-        
+
         $class->delete();
 
         return $this->success(null, 'Class deleted successfully');

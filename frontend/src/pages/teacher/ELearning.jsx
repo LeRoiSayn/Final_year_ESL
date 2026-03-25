@@ -60,15 +60,12 @@ const ELearning = () => {
       const onlinePayload =
         onlineCoursesRes.data?.courses ?? onlineCoursesRes.data;
       setOnlineCourses(Array.isArray(onlinePayload) ? onlinePayload : []);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      // Fallback to regular courses endpoint
+    } catch (_) {
       try {
         const coursesRes = await api.get("/courses");
         const fallbackPayload = coursesRes.data?.data ?? coursesRes.data;
         setMyCourses(Array.isArray(fallbackPayload) ? fallbackPayload : []);
-      } catch (e) {
-        console.error("Fallback failed:", e);
+      } catch (_e) {
       }
     } finally {
       setIsLoading(false);
@@ -79,8 +76,7 @@ const ELearning = () => {
     try {
       const response = await api.get(`/elearning/materials/course/${courseId}`);
       setMaterials(response.data.materials || []);
-    } catch (error) {
-      console.error("Error fetching materials:", error);
+    } catch (_) {
       setMaterials([]);
     }
   };
@@ -89,8 +85,7 @@ const ELearning = () => {
     try {
       const response = await api.get(`/elearning/quizzes/course/${courseId}`);
       setQuizzes(response.data.quizzes || []);
-    } catch (error) {
-      console.error("Error fetching quizzes:", error);
+    } catch (_) {
       setQuizzes([]);
     }
   };
@@ -101,8 +96,7 @@ const ELearning = () => {
         `/elearning/assignments/course/${courseId}`,
       );
       setAssignments(response.data.assignments || []);
-    } catch (error) {
-      console.error("Error fetching assignments:", error);
+    } catch (_) {
       setAssignments([]);
     }
   };
@@ -1589,6 +1583,13 @@ const ELearning = () => {
         size="xl"
       >
         <div className="space-y-6">
+          {/* Assignment description */}
+          {data?.assignment?.description && (
+            <div className="p-3 bg-gray-50 dark:bg-dark-200 rounded-xl">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Instructions</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{data.assignment.description}</p>
+            </div>
+          )}
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
@@ -1640,20 +1641,21 @@ const ELearning = () => {
                         {sub.student.registration_number}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3">
+                      {sub.content && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 max-w-xs whitespace-pre-wrap line-clamp-3">{sub.content}</p>
+                      )}
                       {sub.file_name ? (
                         <button
                           onClick={() => downloadFile(sub.id, sub.file_name)}
-                          className="text-primary-600 hover:underline text-xs flex items-center justify-center gap-1"
+                          className="text-primary-600 hover:underline text-xs flex items-center gap-1"
                         >
                           <ArrowDownTrayIcon className="w-4 h-4" />
                           {sub.file_name}
                         </button>
-                      ) : (
-                        <span className="text-gray-400 text-xs">
-                          Aucun fichier
-                        </span>
-                      )}
+                      ) : !sub.content ? (
+                        <span className="text-gray-400 text-xs">Aucun fichier</span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
@@ -1980,7 +1982,7 @@ const ELearning = () => {
                   {assignment.status === "published" ? "Publié" : "Brouillon"}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {assignment.description}
               </p>
               <div className="flex items-center gap-4 mt-3 text-sm">
@@ -2100,7 +2102,15 @@ const ELearning = () => {
           {/* Online Courses Tab */}
           {activeTab === "courses" && (
             <div className="space-y-4">
-              {/* Removed duplicate right-side button; use the central EmptyState action "Créer un cours" */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowModal("course")}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  Créer un cours
+                </button>
+              </div>
               {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map((i) => (
@@ -2115,8 +2125,6 @@ const ELearning = () => {
                   icon={VideoCameraIcon}
                   title="Aucun cours en ligne"
                   description="Créez votre premier cours vidéo pour vos étudiants"
-                  action={() => setShowModal("course")}
-                  actionLabel="Créer un cours"
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2157,8 +2165,6 @@ const ELearning = () => {
                   icon={DocumentTextIcon}
                   title="Aucun document"
                   description="Uploadez des PDF, présentations et autres ressources"
-                  action={() => setShowModal("material")}
-                  actionLabel="Uploader"
                 />
               ) : (
                 <div className="space-y-3">
@@ -2193,8 +2199,6 @@ const ELearning = () => {
                   icon={ClipboardDocumentListIcon}
                   title="Aucun quiz"
                   description="Créez des quiz interactifs avec correction automatique"
-                  action={() => setShowModal("quiz")}
-                  actionLabel="Créer un quiz"
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2229,8 +2233,6 @@ const ELearning = () => {
                   icon={FolderPlusIcon}
                   title="Aucun devoir"
                   description="Créez des devoirs et recevez les soumissions de vos étudiants"
-                  action={() => setShowModal("assignment")}
-                  actionLabel="Créer un devoir"
                 />
               ) : (
                 <div className="space-y-4">
@@ -2274,9 +2276,7 @@ class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, info) {
-    // Log to console - could be extended to remote logging
-    console.error("ErrorBoundary caught:", error, info);
+  componentDidCatch(_error, _info) {
   }
 
   reset = () => this.setState({ hasError: false, error: null });

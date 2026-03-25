@@ -34,6 +34,14 @@ api.interceptors.response.use(
   },
 );
 
+// Auth / OTP APIs
+export const authApi = {
+  verifyLoginOtp: (data) => api.post('/verify-login-otp', data),
+  resendOtp: (data) => api.post('/resend-otp', data),
+  forgotPassword: (data) => api.post('/forgot-password', data),
+  resetPassword: (data) => api.post('/reset-password', data),
+}
+
 // Dashboard APIs
 export const dashboardApi = {
   getAdminStats: () => api.get("/dashboard/admin"),
@@ -73,6 +81,7 @@ export const studentApi = {
   autoEnroll: (id) => api.post(`/students/${id}/auto-enroll`),
   autoEnrollAll: () => api.post("/students/auto-enroll-all"),
   promote: (id) => api.post(`/students/${id}/promote`),
+  advanceSemester: (id) => api.post(`/students/${id}/advance-semester`),
   getCourses: (id) => api.get(`/students/${id}/courses`),
   getGrades: (id) => api.get(`/students/${id}/grades`),
   getAttendance: (id) => api.get(`/students/${id}/attendance`),
@@ -230,6 +239,7 @@ export const adminApi = {
   rejectClassGrades: (classId, reason) => api.post(`/admin/grades/reject-class/${classId}`, { reason }),
   addStudentCourse: (studentId, data) => api.post(`/admin/students/${studentId}/courses`, data),
   removeStudentCourse: (studentId, courseId) => api.delete(`/admin/students/${studentId}/courses/${courseId}`),
+  addTransferGrade: (studentId, data) => api.post(`/admin/students/${studentId}/transfer-grade`, data),
 };
 
 // Registrar user management APIs

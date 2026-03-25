@@ -37,8 +37,29 @@ class Payment extends Model
 
         static::created(function ($payment) {
             $fee = $payment->studentFee;
-            $fee->paid_amount += $payment->amount;
-            $fee->updateStatus();
+            $fee->paid_amount = (float)$fee->paid_amount + (float)$payment->amount;
+
+            // Auto-sync installment plan: mark tranches as paid based on total paid_amount.
+            // Handles overpayments correctly — excess credits the next installment.
+            if (!empty($fee->installment_plan['installments'])) {
+                $plan = $fee->installment_plan;
+                $basePaid  = (float)($plan['base_paid_amount'] ?? 0);
+                $remaining = max(0.0, $fee->paid_amount - $basePaid);
+
+                foreach ($plan['installments'] as &$inst) {
+                    $amt = (float)$inst['amount'];
+                    if ($remaining >= $amt) {
+                        $inst['paid'] = true;
+                        $remaining  -= $amt;
+                    } else {
+                        $inst['paid'] = false;
+                    }
+                }
+                unset($inst);
+                $fee->installment_plan = $plan;
+            }
+
+            $fee->updateStatus(); // calls save() internally
         });
     }
 

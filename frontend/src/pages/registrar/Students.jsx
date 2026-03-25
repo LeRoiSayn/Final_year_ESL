@@ -75,7 +75,7 @@ export default function RegistrarStudents() {
       if (editData.new_password) { payload.password = editData.new_password }
       delete payload.new_password
       await studentApi.update(editStudent.id, payload)
-      toast.success('Étudiant mis à jour avec succès')
+      toast.success(t('student_updated'))
       setEditStudent(null)
       fetchData()
     } catch (error) { toast.error(error.response?.data?.message || t('error')) }
@@ -96,24 +96,24 @@ export default function RegistrarStudents() {
       setPromoteStudent(null)
       fetchData()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur lors de la promotion')
+      toast.error(err.response?.data?.message || t('advance_semester_error'))
     } finally {
       setPromoting(false)
     }
   }
 
   const columns = [
-    { header: 'Étudiant', cell: (row) => (
+    { header: t('student'), cell: (row) => (
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-medium">{row.user?.first_name?.[0]}{row.user?.last_name?.[0]}</div>
         <div><p className="font-medium">{row.user?.first_name} {row.user?.last_name}</p><p className="text-sm text-gray-500 font-mono">{row.student_id}</p></div>
       </div>
     ), exportValue: (row) => `${row.user?.first_name ?? ''} ${row.user?.last_name ?? ''}` },
-    { header: 'Email', accessor: (row) => row.user?.email },
-    { header: 'Département', accessor: (row) => row.department?.name },
-    { header: 'Niveau', cell: (row) => <span className="badge badge-info">{row.level}</span>, exportValue: (row) => row.level },
-    { header: 'Statut', cell: (row) => <span className={`badge ${row.status === 'active' ? 'badge-success' : 'badge-warning'}`}>{row.status}</span>, exportValue: (row) => row.status },
-    { header: 'Actions', noExport: true, cell: (row) => (
+    { header: t('email'), accessor: (row) => row.user?.email },
+    { header: t('department'), accessor: (row) => row.department?.name },
+    { header: t('level'), cell: (row) => <span className="badge badge-info">{row.level}</span>, exportValue: (row) => row.level },
+    { header: t('status'), cell: (row) => <span className={`badge ${row.status === 'active' ? 'badge-success' : 'badge-warning'}`}>{row.status}</span>, exportValue: (row) => row.status },
+    { header: t('actions'), noExport: true, cell: (row) => (
       <div className="flex items-center gap-1">
         <button
           onClick={() => openEdit(row)}
@@ -126,7 +126,7 @@ export default function RegistrarStudents() {
           <button
             onClick={() => setPromoteStudent(row)}
             className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 text-primary-600"
-            title={row.level === 'L3' ? 'Finaliser cursus licence' : `Promouvoir en ${NEXT_LEVEL[row.level]}`}
+            title={row.level === 'L3' ? t('finalize_bachelor') : `${t('promote_to')} ${NEXT_LEVEL[row.level]}`}
           >
             <ArrowUpCircleIcon className="w-4 h-4" />
           </button>
@@ -141,35 +141,35 @@ export default function RegistrarStudents() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div><h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Étudiants</h1><p className="text-gray-500 dark:text-gray-400">Gérer les inscriptions étudiantes</p></div>
-        <button onClick={() => setModalOpen(true)} className="btn-primary"><PlusIcon className="w-5 h-5 mr-2" />Ajouter un étudiant</button>
+        <div><h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('menu_students')}</h1><p className="text-gray-500 dark:text-gray-400">{t('students_subtitle')}</p></div>
+        <button onClick={() => setModalOpen(true)} className="btn-primary"><PlusIcon className="w-5 h-5 mr-2" />{t('add_student')}</button>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card">
-        <DataTable columns={columns} data={students} loading={loading} searchPlaceholder="Rechercher un étudiant..." />
+        <DataTable columns={columns} data={students} loading={loading} searchPlaceholder={t('search_students')} />
       </motion.div>
 
       {/* Edit Student Modal */}
       {editStudent && (
-        <Modal isOpen={true} onClose={() => setEditStudent(null)} title={`Modifier — ${editStudent.user?.first_name} ${editStudent.user?.last_name}`} size="xl">
+        <Modal isOpen={true} onClose={() => setEditStudent(null)} title={`${t('edit')} — ${editStudent.user?.first_name} ${editStudent.user?.last_name}`} size="xl">
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="label">Prénom</label><input type="text" value={editData.first_name} onChange={(e) => setEditData({...editData, first_name: e.target.value})} className="input" required /></div>
-              <div><label className="label">Nom</label><input type="text" value={editData.last_name} onChange={(e) => setEditData({...editData, last_name: e.target.value})} className="input" required /></div>
-              <div><label className="label">Téléphone</label><input type="tel" value={editData.phone} onChange={(e) => setEditData({...editData, phone: e.target.value})} className="input" /></div>
-              <div><label className="label">Date de naissance</label><input type="date" value={editData.date_of_birth} onChange={(e) => setEditData({...editData, date_of_birth: e.target.value})} className="input" /></div>
-              <div><label className="label">Genre</label><select value={editData.gender} onChange={(e) => setEditData({...editData, gender: e.target.value})} className="input"><option value="">Sélectionner</option><option value="male">Masculin</option><option value="female">Féminin</option></select></div>
-              <div><label className="label">Département</label><select value={editData.department_id} onChange={(e) => setEditData({...editData, department_id: e.target.value})} className="input" required><option value="">Sélectionner</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-              <div><label className="label">Niveau</label><select value={editData.level} onChange={(e) => setEditData({...editData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-              <div><label className="label">Statut</label><select value={editData.status} onChange={(e) => setEditData({...editData, status: e.target.value})} className="input">{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-              <div><label className="label">Nom du tuteur</label><input type="text" value={editData.guardian_name} onChange={(e) => setEditData({...editData, guardian_name: e.target.value})} className="input" /></div>
-              <div><label className="label">Téléphone du tuteur</label><input type="tel" value={editData.guardian_phone} onChange={(e) => setEditData({...editData, guardian_phone: e.target.value})} className="input" /></div>
-              <div className="sm:col-span-2"><label className="label">Email du tuteur</label><input type="email" value={editData.guardian_email} onChange={(e) => setEditData({...editData, guardian_email: e.target.value})} className="input" /></div>
-              <div className="sm:col-span-2"><label className="label">Nouveau mot de passe (laisser vide pour ne pas changer)</label><input type="password" value={editData.new_password} onChange={(e) => setEditData({...editData, new_password: e.target.value})} className="input" minLength={6} placeholder="Min. 6 caractères" /></div>
+              <div><label className="label">{t('first_name')}</label><input type="text" value={editData.first_name} onChange={(e) => setEditData({...editData, first_name: e.target.value})} className="input" required /></div>
+              <div><label className="label">{t('last_name')}</label><input type="text" value={editData.last_name} onChange={(e) => setEditData({...editData, last_name: e.target.value})} className="input" required /></div>
+              <div><label className="label">{t('phone')}</label><input type="tel" value={editData.phone} onChange={(e) => setEditData({...editData, phone: e.target.value})} className="input" /></div>
+              <div><label className="label">{t('date_of_birth')}</label><input type="date" value={editData.date_of_birth} onChange={(e) => setEditData({...editData, date_of_birth: e.target.value})} className="input" /></div>
+              <div><label className="label">{t('gender')}</label><select value={editData.gender} onChange={(e) => setEditData({...editData, gender: e.target.value})} className="input"><option value="">{t('select_option')}</option><option value="male">{t('male')}</option><option value="female">{t('female')}</option></select></div>
+              <div><label className="label">{t('department')}</label><select value={editData.department_id} onChange={(e) => setEditData({...editData, department_id: e.target.value})} className="input" required><option value="">{t('select_option')}</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+              <div><label className="label">{t('level')}</label><select value={editData.level} onChange={(e) => setEditData({...editData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+              <div><label className="label">{t('status')}</label><select value={editData.status} onChange={(e) => setEditData({...editData, status: e.target.value})} className="input">{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+              <div><label className="label">{t('guardian_name')}</label><input type="text" value={editData.guardian_name} onChange={(e) => setEditData({...editData, guardian_name: e.target.value})} className="input" /></div>
+              <div><label className="label">{t('guardian_phone')}</label><input type="tel" value={editData.guardian_phone} onChange={(e) => setEditData({...editData, guardian_phone: e.target.value})} className="input" /></div>
+              <div className="sm:col-span-2"><label className="label">{t('guardian_email')}</label><input type="email" value={editData.guardian_email} onChange={(e) => setEditData({...editData, guardian_email: e.target.value})} className="input" /></div>
+              <div className="sm:col-span-2"><label className="label">{t('new_password_hint')}</label><input type="password" value={editData.new_password} onChange={(e) => setEditData({...editData, new_password: e.target.value})} className="input" minLength={6} /></div>
             </div>
             <div className="flex justify-end gap-3 pt-4">
-              <button type="button" onClick={() => setEditStudent(null)} className="btn-secondary">Annuler</button>
-              <button type="submit" className="btn-primary">Enregistrer</button>
+              <button type="button" onClick={() => setEditStudent(null)} className="btn-secondary">{t('cancel')}</button>
+              <button type="submit" className="btn-primary">{t('save_changes')}</button>
             </div>
           </form>
         </Modal>
@@ -189,7 +189,7 @@ export default function RegistrarStudents() {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {promoteStudent.level === 'L3' ? 'Finaliser le cursus licence' : 'Promotion académique'}
+                  {promoteStudent.level === 'L3' ? t('finalize_bachelor') : t('academic_promotion')}
                 </h2>
                 <p className="text-sm text-gray-500">
                   {promoteStudent.user?.first_name} {promoteStudent.user?.last_name} — {promoteStudent.student_id}
@@ -198,20 +198,20 @@ export default function RegistrarStudents() {
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
               {promoteStudent.level === 'L3'
-                ? `Confirmer la fin du cursus licence (L3). L'étudiant sera marqué comme diplômé.`
-                : `Promouvoir l'étudiant de ${promoteStudent.level} vers ${NEXT_LEVEL[promoteStudent.level]}.`
+                ? t('finalize_l3_confirm')
+                : `${t('promote_to')} ${promoteStudent.level} → ${NEXT_LEVEL[promoteStudent.level]}.`
               }
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
-              Les cours échoués seront enregistrés comme cours à repasser. L'administrateur devra ensuite inscrire l'étudiant aux cours du prochain niveau.
+              {t('failed_courses_note')}
             </p>
             <div className="flex gap-3">
               <button onClick={handlePromote} disabled={promoting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50">
                 <CheckCircleIcon className="w-4 h-4" />
-                {promoting ? 'En cours...' : 'Confirmer'}
+                {promoting ? t('promoting') : t('confirm')}
               </button>
               <button onClick={() => setPromoteStudent(null)} disabled={promoting} className="px-4 py-2.5 border border-gray-300 dark:border-dark-100 rounded-xl text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-dark-100 transition-colors">
-                Annuler
+                {t('cancel')}
               </button>
             </div>
           </motion.div>
@@ -219,26 +219,26 @@ export default function RegistrarStudents() {
       )}
 
       {/* Create Student Modal */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Ajouter un étudiant" size="xl">
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={t('add_student')} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className="label">Prénom</label><input type="text" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="input" required /></div>
-            <div><label className="label">Nom</label><input type="text" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="input" required /></div>
-            <div><label className="label">Email</label><input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="input" required /></div>
-            <div><label className="label">Nom d'utilisateur</label><input type="text" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} className="input" required /></div>
-            <div><label className="label">Mot de passe</label><input type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="input" required minLength={6} /></div>
-            <div><label className="label">Téléphone</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input" /></div>
-            <div><label className="label">Date de naissance</label><input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})} className="input" /></div>
-            <div><label className="label">Genre</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input"><option value="">Sélectionner</option><option value="male">Masculin</option><option value="female">Féminin</option></select></div>
-            <div><label className="label">Département</label><select value={formData.department_id} onChange={(e) => setFormData({...formData, department_id: e.target.value})} className="input" required><option value="">Sélectionner</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-            <div><label className="label">Niveau</label><select value={formData.level} onChange={(e) => setFormData({...formData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-            <div><label className="label">Date d'inscription</label><input type="date" value={formData.enrollment_date} onChange={(e) => setFormData({...formData, enrollment_date: e.target.value})} className="input" required /></div>
-            <div><label className="label">Nom du tuteur</label><input type="text" value={formData.guardian_name} onChange={(e) => setFormData({...formData, guardian_name: e.target.value})} className="input" /></div>
+            <div><label className="label">{t('first_name')}</label><input type="text" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="input" required /></div>
+            <div><label className="label">{t('last_name')}</label><input type="text" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="input" required /></div>
+            <div><label className="label">{t('email')}</label><input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="input" required /></div>
+            <div><label className="label">{t('username_label')}</label><input type="text" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} className="input" required /></div>
+            <div><label className="label">{t('password_label')}</label><input type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="input" required minLength={6} /></div>
+            <div><label className="label">{t('phone')}</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input" /></div>
+            <div><label className="label">{t('date_of_birth')}</label><input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})} className="input" /></div>
+            <div><label className="label">{t('gender')}</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input"><option value="">{t('select_option')}</option><option value="male">{t('male')}</option><option value="female">{t('female')}</option></select></div>
+            <div><label className="label">{t('department')}</label><select value={formData.department_id} onChange={(e) => setFormData({...formData, department_id: e.target.value})} className="input" required><option value="">{t('select_option')}</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+            <div><label className="label">{t('level')}</label><select value={formData.level} onChange={(e) => setFormData({...formData, level: e.target.value})} className="input" required>{LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+            <div><label className="label">{t('enrollment_date')}</label><input type="date" value={formData.enrollment_date} onChange={(e) => setFormData({...formData, enrollment_date: e.target.value})} className="input" required /></div>
+            <div><label className="label">{t('guardian_name')}</label><input type="text" value={formData.guardian_name} onChange={(e) => setFormData({...formData, guardian_name: e.target.value})} className="input" /></div>
           </div>
           <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
-            <p className="text-sm text-primary-700 dark:text-primary-300">ℹ️ L'étudiant sera automatiquement inscrit à tous les cours de son département et niveau.</p>
+            <p className="text-sm text-primary-700 dark:text-primary-300">ℹ️ {t('student_auto_enrolled_info')}</p>
           </div>
-          <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Annuler</button><button type="submit" className="btn-primary">Créer l'étudiant</button></div>
+          <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">{t('cancel')}</button><button type="submit" className="btn-primary">{t('create_student')}</button></div>
         </form>
       </Modal>
     </div>

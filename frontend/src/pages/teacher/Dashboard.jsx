@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
 import { useI18n } from '../../i18n/index.jsx'
+import { useWidgetSettings } from '../../hooks/useWidgetSettings'
 import { BookOpenIcon, UserGroupIcon, CalendarIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom'
 
@@ -10,12 +11,13 @@ export default function TeacherDashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const { t } = useI18n()
+  const showWidget = useWidgetSettings()
 
   useEffect(() => { fetchStats() }, [])
 
   const fetchStats = async () => {
     try { const response = await dashboardApi.getTeacherStats(); setStats(response.data.data) } 
-    catch (error) { console.error('Failed to fetch stats:', error) } finally { setLoading(false) }
+    catch (_) { } finally { setLoading(false) }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -27,12 +29,15 @@ export default function TeacherDashboard() {
         <p className="text-gray-500 dark:text-gray-400">{t('welcome_teacher')}</p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard title={t('my_classes')} value={stats?.total_classes || 0} icon={BookOpenIcon} color="purple" />
-        <StatCard title={t('total_students')} value={stats?.total_students || 0} icon={UserGroupIcon} color="blue" delay={0.1} />
-        <StatCard title={t('this_semester')} value="2025-2026 / S1" icon={CalendarIcon} color="teal" delay={0.2} />
-      </div>
+      {showWidget('stats') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <StatCard title={t('my_classes')} value={stats?.total_classes || 0} icon={BookOpenIcon} color="purple" />
+          <StatCard title={t('total_students')} value={stats?.total_students || 0} icon={UserGroupIcon} color="blue" delay={0.1} />
+          <StatCard title={t('this_semester')} value="2025-2026 / S1" icon={CalendarIcon} color="teal" delay={0.2} />
+        </div>
+      )}
 
+      {showWidget('my_classes') && (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('my_classes')}</h3>
         <div className="space-y-4">
@@ -58,7 +63,9 @@ export default function TeacherDashboard() {
           )}
         </div>
       </motion.div>
+      )}
 
+      {showWidget('quick_actions') && (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('quick_actions')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -80,6 +87,7 @@ export default function TeacherDashboard() {
           </Link>
         </div>
       </motion.div>
+      )}
     </div>
   )
 }

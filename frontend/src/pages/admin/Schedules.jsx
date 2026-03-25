@@ -262,19 +262,19 @@ export default function AdminSchedules() {
                       </div>
                       {schedule.class?.teacher?.user && (
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
-                          👨‍🏫 {schedule.class.teacher.user.first_name} {schedule.class.teacher.user.last_name}
+                           {schedule.class.teacher.user.first_name} {schedule.class.teacher.user.last_name}
                         </p>
                       )}
                       {(schedule.midterm_date || schedule.final_date) && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {schedule.midterm_date && (
                             <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
-                              📝 {t('midterm_exam')}: {schedule.midterm_date}
+                               {t('midterm_exam')}: {schedule.midterm_date}
                             </span>
                           )}
                           {schedule.final_date && (
                             <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-full">
-                              🎓 {t('final_exam')}: {schedule.final_date}
+                               {t('final_exam')}: {schedule.final_date}
                             </span>
                           )}
                         </div>

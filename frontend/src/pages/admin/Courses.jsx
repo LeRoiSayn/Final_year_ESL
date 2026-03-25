@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
+const SEMESTERS = ['1', '2', '3']
 
 export default function AdminCourses() {
   const { t } = useI18n()
@@ -28,6 +29,7 @@ export default function AdminCourses() {
     description: '',
     credits: '',
     level: '',
+    semester: '',
     course_type: 'specialisation',
     hours_per_week: '3',
   })
@@ -78,6 +80,7 @@ export default function AdminCourses() {
       description: '',
       credits: '',
       level: '',
+      semester: '',
       course_type: 'specialisation',
       hours_per_week: '3',
     })
@@ -92,6 +95,7 @@ export default function AdminCourses() {
       description: course.description || '',
       credits: course.credits.toString(),
       level: course.level,
+      semester: course.semester?.toString() || '',
       course_type: course.course_type || 'specialisation',
       hours_per_week: course.hours_per_week?.toString() || '3',
     })
@@ -141,6 +145,10 @@ export default function AdminCourses() {
     {
       header: t('level'),
       cell: (row) => <span className="badge badge-info">{row.level}</span>,
+    },
+    {
+      header: t('semester'),
+      cell: (row) => row.semester ? <span className="badge badge-warning">S{row.semester}</span> : <span className="text-gray-400 text-xs">—</span>,
     },
     {
       header: t('course_type'),
@@ -274,6 +282,19 @@ export default function AdminCourses() {
                   <option key={l} value={l}>
                     {l}
                   </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">{t('semester')}</label>
+              <select
+                value={formData.semester}
+                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                className="input"
+              >
+                <option value="">{t('not_defined')}</option>
+                {SEMESTERS.map((s) => (
+                  <option key={s} value={s}>{t(`semester_${s}`)}</option>
                 ))}
               </select>
             </div>

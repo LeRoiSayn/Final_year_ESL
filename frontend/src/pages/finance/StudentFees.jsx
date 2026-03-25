@@ -1,39 +1,46 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { studentFeeApi, studentApi, feeTypeApi } from '../../services/api'
 import DataTable from '../../components/DataTable'
 import Modal from '../../components/Modal'
-import { PlusIcon, CalendarDaysIcon, CheckCircleIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PlusIcon } from '@heroicons/react/24/outline'
 import { useI18n } from '../../i18n/index.jsx'
 
 const CURRENT_YEAR = `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`
-const emptyFee = { student_id: '', fee_type_id: '', amount: '', due_date: '', academic_year: CURRENT_YEAR }
+const emptyFee  = { student_id: '', fee_type_id: '', amount: '', due_date: '', academic_year: CURRENT_YEAR }
 const emptyPlan = { plan_type: 'monthly', periods: 3, start_date: '' }
 
 export default function FinanceStudentFees() {
   const { t } = useI18n()
-  const [fees, setFees] = useState([])
+
+  // ── Data ──────────────────────────────────────────────────────
+  const [fees, setFees]         = useState([])
   const [students, setStudents] = useState([])
   const [feeTypes, setFeeTypes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [assignModalOpen, setAssignModalOpen] = useState(false)
-  const [detailModalOpen, setDetailModalOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [formData, setFormData] = useState(emptyFee)
+  const [loading, setLoading]   = useState(true)
 
-  // Detail / plan state
-  const [selectedFee, setSelectedFee] = useState(null)
-  const [planMode, setPlanMode] = useState(false)
-  const [planData, setPlanData] = useState(emptyPlan)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  // ── Student detail modal ──────────────────────────────────────
+  const [detailOpen, setDetailOpen]           = useState(false)
+  const [detailData, setDetailData]           = useState(null)   // { student, fees (with payments) }
+  const [detailLoading, setDetailLoading]     = useState(false)
+
+  // ── Inline plan form (within detail modal) ────────────────────
+  const [planFeeId, setPlanFeeId]   = useState(null)  // id of fee being planned
+  const [planData, setPlanData]     = useState(emptyPlan)
+  const [planSaving, setPlanSaving] = useState(false)
+
+  // ── Assign fee modal ──────────────────────────────────────────
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [formData, setFormData]     = useState(emptyFee)
+  const [saving, setSaving]         = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
     try {
       const [feeRes, studRes, typeRes] = await Promise.all([
-        studentFeeApi.getAll({ per_page: 100 }),
+        studentFeeApi.getAll({ per_page: 200 }),
         studentApi.getAll({ per_page: 500 }),
         feeTypeApi.getAll({ active_only: true }),
       ])
@@ -43,300 +50,400 @@ export default function FinanceStudentFees() {
     } catch { toast.error(t('error')) } finally { setLoading(false) }
   }
 
+  // ── Group fees by student ──────────────────────────────────────
+  const studentRows = useMemo(() => {
+    const map = {}
+    fees.forEach(fee => {
+      if (!fee.student) return
+      const sid = fee.student.id
+      if (!map[sid]) map[sid] = { id: sid, student_id: fee.student.student_id, student: fee.student, fees: [] }
+      map[sid].fees.push(fee)
+    })
+    return Object.values(map)
+  }, [fees])
+
+  // ── Helpers ──────────────────────────────────────────────────
+  const fmt = (v) => new Intl.NumberFormat('fr-FR').format(v || 0) + ' RWF'
+  const isReg = (f) => f.fee_type?.category === 'registration'
+  const bal   = (f) => parseFloat(f.amount || 0) - parseFloat(f.paid_amount || 0)
+
+  /** Compute installment paid status dynamically from paid_amount (handles overpayments) */
+  const getInstStatuses = (fee) => {
+    if (!fee.installment_plan?.installments) return []
+    const plan     = fee.installment_plan
+    const basePaid = parseFloat(plan.base_paid_amount ?? 0)
+    let rem        = Math.max(0, parseFloat(fee.paid_amount || 0) - basePaid)
+    return plan.installments.map(inst => {
+      const amt = parseFloat(inst.amount)
+      if (rem >= amt) { rem -= amt; return { ...inst, isPaid: true,  leftover: 0 } }
+      const partial = rem; rem = 0
+      return { ...inst, isPaid: false, leftover: amt - partial }
+    })
+  }
+
+  /** Compute summary for a student row */
+  const summary = (row) => {
+    const reg     = row.fees.find(f => isReg(f))
+    const tuition = row.fees.filter(f => !isReg(f))
+    const total   = tuition.reduce((s, f) => s + parseFloat(f.amount || 0), 0)
+    const paid    = tuition.reduce((s, f) => s + parseFloat(f.paid_amount || 0), 0)
+    return { reg, tuition, total, balance: total - paid, hasPlan: tuition.some(f => f.installment_plan) }
+  }
+
+  // ── Open student detail ───────────────────────────────────────
+  const openDetail = async (row) => {
+    setDetailOpen(true)
+    setDetailLoading(true)
+    setPlanFeeId(null)
+    setPlanData(emptyPlan)
+    try {
+      const res = await studentFeeApi.getByStudent(row.student.id)
+      setDetailData({ student: row.student, fees: res.data.data.fees || [] })
+    } catch { toast.error(t('error')) } finally { setDetailLoading(false) }
+  }
+
+  const refreshDetail = async () => {
+    if (!detailData) return
+    try {
+      const res = await studentFeeApi.getByStudent(detailData.student.id)
+      setDetailData(prev => ({ ...prev, fees: res.data.data.fees || [] }))
+    } catch { /* silent */ }
+  }
+
+  const closeDetail = () => { setDetailOpen(false); setDetailData(null); setPlanFeeId(null) }
+
+  // ── Plan submit ───────────────────────────────────────────────
+  const handlePlanSubmit = async (e) => {
+    e.preventDefault()
+    if (!planFeeId) return
+    setPlanSaving(true)
+    try {
+      const res = await studentFeeApi.setInstallmentPlan(planFeeId, planData)
+      toast.success(`Plan défini — ${planData.periods} tranches`)
+      const updated = res.data.data
+      setFees(prev => prev.map(f => f.id === updated.id ? { ...f, installment_plan: updated.installment_plan } : f))
+      await refreshDetail()
+      setPlanFeeId(null)
+      setPlanData(emptyPlan)
+    } catch (err) { toast.error(err.response?.data?.message || 'Erreur') }
+    finally { setPlanSaving(false) }
+  }
+
+  // ── Assign fee submit ─────────────────────────────────────────
   const handleAssignSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
+    setSaving(true)
     try {
       await studentFeeApi.create(formData)
       toast.success(t('fee_assigned'))
-      setAssignModalOpen(false)
+      setAssignOpen(false)
       setFormData(emptyFee)
       fetchData()
+      if (detailData && String(formData.student_id) === String(detailData.student.id)) {
+        await refreshDetail()
+      }
     } catch (err) { toast.error(err.response?.data?.message || 'Erreur') }
-    finally { setSubmitting(false) }
+    finally { setSaving(false) }
   }
 
-  const handlePlanSubmit = async (e) => {
-    e.preventDefault()
-    if (!selectedFee) return
-    setSubmitting(true)
-    try {
-      const res = await studentFeeApi.setInstallmentPlan(selectedFee.id, planData)
-      toast.success('Plan de paiement défini')
-      setPlanMode(false)
-      setPlanData(emptyPlan)
-      const updated = res.data.data
-      setSelectedFee(updated)
-      setFees(prev => prev.map(f => f.id === updated.id ? updated : f))
-    } catch (err) { toast.error(err.response?.data?.message || 'Erreur') }
-    finally { setSubmitting(false) }
+  const handleFeeTypeChange = (ftId) => {
+    const ft = feeTypes.find(f => f.id.toString() === ftId)
+    setFormData(p => ({ ...p, fee_type_id: ftId, amount: ft?.amount || '' }))
   }
 
-  const handleDelete = async () => {
-    if (!selectedFee) return
-    setSubmitting(true)
-    try {
-      await studentFeeApi.delete(selectedFee.id)
-      toast.success('Frais supprimé')
-      setDetailModalOpen(false)
-      setDeleteConfirm(false)
-      setSelectedFee(null)
-      fetchData()
-    } catch (err) { toast.error(err.response?.data?.message || 'Impossible de supprimer') }
-    finally { setSubmitting(false) }
-  }
-
-  const handleFeeTypeChange = (feeTypeId) => {
-    const ft = feeTypes.find(f => f.id.toString() === feeTypeId)
-    setFormData(p => ({ ...p, fee_type_id: feeTypeId, amount: ft?.amount || '' }))
-  }
-
-  const openDetail = (fee) => {
-    setSelectedFee(fee)
-    setPlanMode(false)
-    setPlanData(emptyPlan)
-    setDeleteConfirm(false)
-    setDetailModalOpen(true)
-  }
-
-  const closeDetail = () => {
-    setDetailModalOpen(false)
-    setPlanMode(false)
-    setDeleteConfirm(false)
-    setSelectedFee(null)
-  }
-
-  const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR').format(amount) + ' RWF'
-
-  const getStatusBadge = (status) => {
-    const styles = { paid: 'badge-success', partial: 'badge-warning', pending: 'badge-info', overdue: 'badge-danger' }
-    return <span className={`badge ${styles[status] || 'badge-info'}`}>{status}</span>
-  }
-
-  const remaining = selectedFee ? (parseFloat(selectedFee.amount) - parseFloat(selectedFee.paid_amount)) : 0
-  const installmentPreviewAmount = remaining > 0 && planData.periods > 0
-    ? Math.round(remaining / parseInt(planData.periods))
+  // ── Plan preview amount ───────────────────────────────────────
+  const planFeeObj  = detailData?.fees.find(f => f.id === planFeeId)
+  const planBal     = planFeeObj ? bal(planFeeObj) : 0
+  const planPreview = planBal > 0 && planData.periods > 0
+    ? Math.round(planBal / parseInt(planData.periods))
     : 0
 
+  // ── Table columns (student-centric) ───────────────────────────
   const columns = [
-    { header: 'Étudiant', cell: (row) => (
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-medium text-sm">
-          {row.student?.user?.first_name?.[0]}{row.student?.user?.last_name?.[0]}
+    {
+      header: 'Étudiant',
+      accessor: row => `${row.student?.user?.first_name} ${row.student?.user?.last_name}`,
+      cell: row => (
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
+            {row.student?.user?.first_name?.[0]}{row.student?.user?.last_name?.[0]}
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 dark:text-white">{row.student?.user?.first_name} {row.student?.user?.last_name}</p>
+            <p className="text-xs text-gray-500">{row.student?.student_id}</p>
+          </div>
         </div>
-        <div>
-          <p className="font-medium">{row.student?.user?.first_name} {row.student?.user?.last_name}</p>
-          <p className="text-xs text-gray-500">{row.student?.student_id}</p>
-        </div>
-      </div>
-    )},
-    { header: 'Type', accessor: (row) => row.fee_type?.name },
-    { header: 'Montant', cell: (row) => <span className="font-semibold">{formatCurrency(row.amount)}</span> },
-    { header: 'Payé', cell: (row) => <span className="text-green-600">{formatCurrency(row.paid_amount)}</span> },
-    { header: 'Solde', cell: (row) => <span className={row.amount - row.paid_amount > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>{formatCurrency(row.amount - row.paid_amount)}</span> },
-    { header: 'Échéance', accessor: (row) => row.due_date ? new Date(row.due_date).toLocaleDateString('fr-FR') : '—' },
-    { header: 'Plan', cell: (row) => row.installment_plan
-      ? <span className="badge badge-info flex items-center gap-1"><CalendarDaysIcon className="w-3.5 h-3.5" />{row.installment_plan.periods} tr.</span>
-      : <span className="text-gray-400 text-xs">—</span>
+      ),
     },
-    { header: 'Statut', cell: (row) => getStatusBadge(row.status) },
+    { header: 'Niveau', accessor: row => row.student?.level },
+    {
+      header: 'Inscription',
+      cell: row => {
+        const { reg } = summary(row)
+        if (!reg) return <span className="text-xs text-gray-400">—</span>
+        return bal(reg) <= 0
+          ? <span className="badge badge-success text-xs">Payé</span>
+          : <span className="badge badge-danger text-xs">Impayé</span>
+      },
+    },
+    {
+      header: 'Solde scolarité',
+      cell: row => {
+        const s = summary(row)
+        return (
+          <div>
+            <p className={`font-semibold text-sm ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(s.balance)}</p>
+            <p className="text-xs text-gray-400">/ {fmt(s.total)}</p>
+          </div>
+        )
+      },
+    },
+    {
+      header: 'Plan',
+      cell: row => {
+        const { hasPlan, tuition } = summary(row)
+        if (!hasPlan) return <span className="text-xs text-gray-400">—</span>
+        const pf = tuition.find(f => f.installment_plan)
+        return <span className="badge badge-info text-xs">{pf?.installment_plan?.periods} tranches</span>
+      },
+    },
+    {
+      header: 'Statut',
+      cell: row => {
+        const s = summary(row)
+        if (s.balance <= 0 && (!s.reg || bal(s.reg) <= 0)) return <span className="badge badge-success">Réglé</span>
+        if (s.balance > 0) return <span className="badge badge-warning">En attente</span>
+        return <span className="badge badge-info">Partiel</span>
+      },
+    },
   ]
 
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Frais des étudiants</h1>
-          <p className="text-gray-500 dark:text-gray-400">Cliquez sur une ligne pour voir les détails ou créer un plan de paiement</p>
+          <p className="text-gray-500 dark:text-gray-400">Cliquez sur un étudiant pour gérer ses frais et paiements</p>
         </div>
-        <button onClick={() => setAssignModalOpen(true)} className="btn-primary flex items-center gap-2">
-          <PlusIcon className="w-5 h-5" />
-          Assigner frais
+        <button onClick={() => setAssignOpen(true)} className="btn-primary flex items-center gap-2">
+          <PlusIcon className="w-5 h-5" /> Assigner frais
         </button>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card">
         <DataTable
           columns={columns}
-          data={fees}
+          data={studentRows}
           loading={loading}
           searchPlaceholder="Rechercher..."
           onRowClick={openDetail}
         />
       </motion.div>
 
-      {/* ── Detail / Plan modal ── */}
-      <Modal isOpen={detailModalOpen} onClose={closeDetail} title="Détail du frais" size="lg">
-        {selectedFee && (
-          <div className="space-y-6">
+      {/* ══ Student detail modal ══ */}
+      <Modal isOpen={detailOpen} onClose={closeDetail} title="Dossier financier" size="xl">
+        {detailLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-7 h-7 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : detailData && (
+          <div className="space-y-8">
 
-            {/* Student + fee summary */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-dark-300">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-teal-500 flex items-center justify-center text-white font-semibold text-lg">
-                  {selectedFee.student?.user?.first_name?.[0]}{selectedFee.student?.user?.last_name?.[0]}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {selectedFee.student?.user?.first_name} {selectedFee.student?.user?.last_name}
-                  </p>
-                  <p className="text-sm text-gray-500">{selectedFee.student?.student_id} · {selectedFee.fee_type?.name}</p>
-                </div>
-                <div className="ml-auto">{getStatusBadge(selectedFee.status)}</div>
+            {/* Student header */}
+            <div className="flex items-center gap-4 pb-5 border-b border-gray-200 dark:border-dark-100">
+              <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                {detailData.student?.user?.first_name?.[0]}{detailData.student?.user?.last_name?.[0]}
               </div>
-
-              <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-300">
-                <p className="text-xs text-gray-500 mb-1">Montant total</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(selectedFee.amount)}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20">
-                <p className="text-xs text-green-600 mb-1">Déjà payé</p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(selectedFee.paid_amount)}</p>
-              </div>
-              <div className={`col-span-2 p-4 rounded-xl ${remaining > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-green-50 dark:bg-green-900/20'}`}>
-                <p className={`text-xs mb-1 ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>Solde restant</p>
-                <p className={`text-2xl font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(remaining)}</p>
-                {selectedFee.amount > 0 && (
-                  <div className="mt-2 h-2 rounded-full bg-gray-200 dark:bg-dark-100 overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (selectedFee.paid_amount / selectedFee.amount) * 100)}%` }}
-                    />
-                  </div>
-                )}
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  {detailData.student?.user?.first_name} {detailData.student?.user?.last_name}
+                </p>
+                <p className="text-sm text-gray-500">{detailData.student?.student_id} · Niveau {detailData.student?.level}</p>
               </div>
             </div>
 
-            {/* Installment plan section */}
-            {!planMode && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Plan de paiement par tranches</h4>
-                  {remaining > 0 && (
-                    <button onClick={() => setPlanMode(true)} className="btn-secondary text-sm flex items-center gap-1.5">
-                      <CalendarDaysIcon className="w-4 h-4" />
-                      {selectedFee.installment_plan ? 'Modifier le plan' : 'Créer un plan'}
-                    </button>
-                  )}
-                </div>
-
-                {selectedFee.installment_plan ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-500 mb-2">
-                      Plan {selectedFee.installment_plan.plan_type === 'monthly' ? 'mensuel' : 'trimestriel'} — {selectedFee.installment_plan.periods} tranches
-                    </p>
-                    <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
-                      {selectedFee.installment_plan.installments?.map((inst) => (
-                        <div key={inst.number} className={`flex items-center justify-between p-3 rounded-xl text-sm ${inst.paid ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-dark-300'}`}>
-                          <div className="flex items-center gap-3">
-                            {inst.paid
-                              ? <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-                              : <ClockIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                            }
-                            <div>
-                              <p className="font-medium">Tranche {inst.number}</p>
-                              <p className="text-xs text-gray-500">{new Date(inst.due_date).toLocaleDateString('fr-FR')}</p>
-                            </div>
-                          </div>
-                          <span className={`font-semibold ${inst.paid ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                            {formatCurrency(inst.amount)}
-                          </span>
-                        </div>
-                      ))}
+            {/* Registration fee */}
+            {(() => {
+              const regFee = detailData.fees.find(f => isReg(f))
+              if (!regFee) return null
+              const b = bal(regFee)
+              return (
+                <section>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Frais d'inscription</p>
+                  <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{regFee.fee_type?.name}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400">Non inclus dans le total de scolarité</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900 dark:text-white">{fmt(regFee.amount)}</p>
+                      {b <= 0
+                        ? <p className="text-xs text-green-600">Payé intégralement</p>
+                        : <p className="text-xs text-red-600 font-medium">Solde dû : {fmt(b)}</p>
+                      }
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-6 border-2 border-dashed border-gray-200 dark:border-dark-100 rounded-xl">
-                    <CalendarDaysIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Aucun plan de paiement défini</p>
-                    {remaining <= 0 && <p className="text-xs text-green-600 mt-1">Ce frais est entièrement payé.</p>}
-                  </div>
-                )}
-              </div>
-            )}
+                </section>
+              )
+            })()}
 
-            {/* Plan form */}
-            {planMode && remaining > 0 && (
-              <form onSubmit={handlePlanSubmit} className="space-y-4 p-4 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/10">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">
-                    Définir un plan <span className="text-red-600">— {formatCurrency(remaining)} restant</span>
-                  </h4>
-                  <button type="button" onClick={() => { setPlanMode(false); setPlanData(emptyPlan) }} className="text-sm text-gray-500 hover:text-gray-700">Annuler</button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Type de plan</label>
-                    <select value={planData.plan_type} onChange={e => setPlanData(p => ({...p, plan_type: e.target.value}))} className="input">
-                      <option value="monthly">Mensuel</option>
-                      <option value="quarterly">Trimestriel</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">Nombre de tranches</label>
-                    <input type="number" value={planData.periods} onChange={e => setPlanData(p => ({...p, periods: parseInt(e.target.value) || 2}))} className="input" required min="2" max="24" />
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Date de la première tranche</label>
-                  <input type="date" value={planData.start_date} onChange={e => setPlanData(p => ({...p, start_date: e.target.value}))} className="input" required />
-                </div>
-                {installmentPreviewAmount > 0 && (
-                  <div className="bg-white dark:bg-dark-200 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">Aperçu du plan</p>
-                    <p className="text-sm text-blue-700 dark:text-blue-400">
-                      {planData.periods} tranches de ≈ <strong>{formatCurrency(installmentPreviewAmount)}</strong>
-                      {' '}({planData.plan_type === 'monthly' ? 'chaque mois' : 'chaque trimestre'})
-                    </p>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => { setPlanMode(false); setPlanData(emptyPlan) }} className="btn-secondary flex-1">Annuler</button>
-                  <button type="submit" disabled={submitting} className="btn-primary flex-1">{submitting ? 'Enregistrement...' : 'Confirmer le plan'}</button>
-                </div>
-              </form>
-            )}
+            {/* Tuition fees */}
+            {(() => {
+              const tuition = detailData.fees.filter(f => !isReg(f))
+              if (tuition.length === 0) return null
+              return (
+                <section>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Frais de scolarité</p>
+                  <div className="space-y-4">
+                    {tuition.map(fee => {
+                      const b          = bal(fee)
+                      const instRows   = getInstStatuses(fee)
+                      const isPlanning = planFeeId === fee.id
 
-            {/* Delete section */}
-            <div className="border-t border-gray-100 dark:border-dark-100 pt-4">
-              {!deleteConfirm ? (
-                <button
-                  onClick={() => setDeleteConfirm(true)}
-                  className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition-colors"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  Supprimer ce frais
-                </button>
-              ) : (
-                <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 space-y-3">
-                  <p className="text-sm font-semibold text-red-800 dark:text-red-300">Confirmer la suppression ?</p>
-                  <p className="text-xs text-red-600 dark:text-red-400">
-                    Cette action est irréversible. La suppression sera refusée si des paiements sont associés à ce frais.
-                  </p>
-                  <div className="flex gap-2">
-                    <button onClick={() => setDeleteConfirm(false)} className="btn-secondary text-sm flex-1">Annuler</button>
-                    <button
-                      onClick={handleDelete}
-                      disabled={submitting}
-                      className="flex-1 px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {submitting ? 'Suppression...' : 'Supprimer définitivement'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                      return (
+                        <div key={fee.id} className="rounded-xl border border-gray-200 dark:border-dark-100 overflow-hidden">
+                          {/* Fee summary bar */}
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-dark-300">
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">{fee.fee_type?.name}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Total {fmt(fee.amount)} · Payé <span className="text-green-600">{fmt(fee.paid_amount)}</span>
+                                {b > 0 && <> · Solde <span className="text-red-600 font-semibold">{fmt(b)}</span></>}
+                              </p>
+                            </div>
+                            {b <= 0
+                              ? <span className="badge badge-success text-xs">Soldé</span>
+                              : <span className="badge badge-warning text-xs">En attente</span>
+                            }
+                          </div>
 
+                          {/* Plan section */}
+                          <div className="px-4 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Plan de paiement par tranches</p>
+                              {b > 0 && (
+                                <button
+                                  onClick={() => { setPlanFeeId(isPlanning ? null : fee.id); setPlanData(emptyPlan) }}
+                                  className="text-xs text-primary-600 hover:text-primary-700 border border-primary-200 rounded px-2 py-0.5 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-colors"
+                                >
+                                  {fee.installment_plan ? 'Modifier' : '+ Définir'}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Inline plan form */}
+                            {isPlanning && (
+                              <form onSubmit={handlePlanSubmit} className="mb-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-dark-100 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="label text-xs">Type</label>
+                                    <select value={planData.plan_type} onChange={e => setPlanData(p => ({ ...p, plan_type: e.target.value }))} className="input text-sm">
+                                      <option value="monthly">Mensuel</option>
+                                      <option value="quarterly">Trimestriel</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="label text-xs">Tranches</label>
+                                    <input type="number" value={planData.periods} onChange={e => setPlanData(p => ({ ...p, periods: parseInt(e.target.value) || 2 }))} className="input text-sm" min="2" max="24" required />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="label text-xs">Date de la 1ère tranche</label>
+                                  <input type="date" value={planData.start_date} onChange={e => setPlanData(p => ({ ...p, start_date: e.target.value }))} className="input text-sm" required />
+                                </div>
+                                {planPreview > 0 && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    ≈ {fmt(planPreview)} × {planData.periods} tranches ({planData.plan_type === 'monthly' ? 'mensuel' : 'trimestriel'})
+                                  </p>
+                                )}
+                                <div className="flex gap-2">
+                                  <button type="button" onClick={() => setPlanFeeId(null)} className="btn-secondary text-xs flex-1">Annuler</button>
+                                  <button type="submit" disabled={planSaving} className="btn-primary text-xs flex-1">{planSaving ? '...' : 'Confirmer le plan'}</button>
+                                </div>
+                              </form>
+                            )}
+
+                            {/* Installment rows */}
+                            {instRows.length > 0 ? (
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-400 mb-1.5">
+                                  Plan {fee.installment_plan.plan_type === 'monthly' ? 'mensuel' : 'trimestriel'} — {fee.installment_plan.periods} tranches
+                                </p>
+                                {instRows.map(inst => (
+                                  <div key={inst.number} className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${inst.isPaid ? 'bg-green-50 dark:bg-green-900/10' : 'bg-gray-50 dark:bg-dark-300'}`}>
+                                    <span className={inst.isPaid ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
+                                      Tranche {inst.number} · {new Date(inst.due_date).toLocaleDateString('fr-FR')}
+                                    </span>
+                                    <span className={`font-semibold ${inst.isPaid ? 'text-green-600' : inst.leftover > 0 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                      {inst.isPaid ? `${fmt(inst.amount)}` : fmt(inst.leftover)}
+                                      {!inst.isPaid && inst.leftover > 0 && <span className="text-gray-400 font-normal"> restant</span>}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic">Aucun plan défini — paiement en une fois.</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              )
+            })()}
+
+            {/* Payment history */}
+            {(() => {
+              const allPayments = detailData.fees
+                .flatMap(f => (f.payments || []).map(p => ({ ...p, feeName: f.fee_type?.name })))
+                .sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
+
+              return (
+                <section>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Historique des paiements</p>
+                  {allPayments.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic text-center py-6">Aucun paiement enregistré.</p>
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 dark:border-dark-100 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 dark:bg-dark-300 text-xs text-gray-500 dark:text-gray-400">
+                            <th className="px-4 py-2.5 text-left font-medium">Référence</th>
+                            <th className="px-4 py-2.5 text-left font-medium">Type de frais</th>
+                            <th className="px-4 py-2.5 text-left font-medium">Méthode</th>
+                            <th className="px-4 py-2.5 text-left font-medium">Date</th>
+                            <th className="px-4 py-2.5 text-right font-medium">Montant</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-dark-100">
+                          {allPayments.map(p => (
+                            <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
+                              <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{p.reference_number}</td>
+                              <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{p.feeName}</td>
+                              <td className="px-4 py-2.5 text-gray-500 capitalize">{p.payment_method?.replace(/_/g, ' ')}</td>
+                              <td className="px-4 py-2.5 text-gray-500">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-green-600">+{fmt(p.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )
+            })()}
           </div>
         )}
       </Modal>
 
-      {/* ── Assign fee modal ── */}
-      <Modal isOpen={assignModalOpen} onClose={() => { setAssignModalOpen(false); setFormData(emptyFee) }} title="Assigner un frais">
+      {/* ══ Assign fee modal ══ */}
+      <Modal isOpen={assignOpen} onClose={() => { setAssignOpen(false); setFormData(emptyFee) }} title="Assigner un frais">
         <form onSubmit={handleAssignSubmit} className="space-y-4">
           <div>
             <label className="label">Étudiant</label>
-            <select value={formData.student_id} onChange={e => setFormData(p => ({...p, student_id: e.target.value}))} className="input" required>
+            <select value={formData.student_id} onChange={e => setFormData(p => ({ ...p, student_id: e.target.value }))} className="input" required>
               <option value="">Sélectionner un étudiant</option>
               {students.map(s => <option key={s.id} value={s.id}>{s.user?.first_name} {s.user?.last_name} ({s.student_id})</option>)}
             </select>
@@ -345,24 +452,24 @@ export default function FinanceStudentFees() {
             <label className="label">Type de frais</label>
             <select value={formData.fee_type_id} onChange={e => handleFeeTypeChange(e.target.value)} className="input" required>
               <option value="">Sélectionner un type</option>
-              {feeTypes.map(f => <option key={f.id} value={f.id}>{f.name} ({formatCurrency(f.amount)})</option>)}
+              {feeTypes.map(f => <option key={f.id} value={f.id}>{f.name} ({fmt(f.amount)})</option>)}
             </select>
           </div>
           <div>
             <label className="label">Montant (RWF)</label>
-            <input type="number" value={formData.amount} onChange={e => setFormData(p => ({...p, amount: e.target.value}))} className="input" required min="0" />
+            <input type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} className="input" required min="0" />
           </div>
           <div>
             <label className="label">Date d'échéance</label>
-            <input type="date" value={formData.due_date} onChange={e => setFormData(p => ({...p, due_date: e.target.value}))} className="input" required />
+            <input type="date" value={formData.due_date} onChange={e => setFormData(p => ({ ...p, due_date: e.target.value }))} className="input" required />
           </div>
           <div>
             <label className="label">Année académique</label>
-            <input type="text" value={formData.academic_year} onChange={e => setFormData(p => ({...p, academic_year: e.target.value}))} className="input" required />
+            <input type="text" value={formData.academic_year} onChange={e => setFormData(p => ({ ...p, academic_year: e.target.value }))} className="input" required />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => { setAssignModalOpen(false); setFormData(emptyFee) }} className="btn-secondary">Annuler</button>
-            <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Enregistrement...' : 'Assigner'}</button>
+            <button type="button" onClick={() => { setAssignOpen(false); setFormData(emptyFee) }} className="btn-secondary">Annuler</button>
+            <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Enregistrement...' : 'Assigner'}</button>
           </div>
         </form>
       </Modal>

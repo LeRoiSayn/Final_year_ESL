@@ -1,982 +1,749 @@
-# ESL - Système de Gestion Universitaire
+# ESL — École de Santé de Libreville
+### University Management System
 
-## École de Santé de Libreville
+![React](https://img.shields.io/badge/React-18.2-61DAFB?style=flat-square&logo=react&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-10-FF2D20?style=flat-square&logo=laravel&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38BDF8?style=flat-square&logo=tailwindcss&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5.1-646CFF?style=flat-square&logo=vite&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-> **Système de gestion universitaire complet** avec plateforme e-learning intégrée, construit avec React.js et Laravel.
-
-![ESL University](https://img.shields.io/badge/ESL-University-green?style=for-the-badge)
-![React](https://img.shields.io/badge/React-18.2-blue?style=for-the-badge&logo=react)
-![Laravel](https://img.shields.io/badge/Laravel-10-red?style=for-the-badge&logo=laravel)
-![MySQL](https://img.shields.io/badge/MySQL-8-orange?style=for-the-badge&logo=mysql)
-![Vite](https://img.shields.io/badge/Vite-5.1-purple?style=for-the-badge&logo=vite)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?style=for-the-badge&logo=tailwind-css)
-
----
-
-## Table des Matières / Table of Contents
-
-1. [Identifiants de Connexion / Login Credentials](#-identifiants-de-connexion--login-credentials)
-2. [Technologies Utilisées / Technologies Used](#-technologies-utilisées--technologies-used)
-3. [Architecture du Système / System Architecture](#-architecture-du-système--system-architecture)
-4. [Installation & Lancement / Installation & Startup](#-installation--lancement--installation--startup)
-5. [Rôles & Fonctionnalités / Roles & Features](#-rôles--fonctionnalités--roles--features)
-6. [Comment Chaque Action Fonctionne / How Every Action Works](#-comment-chaque-action-fonctionne--how-every-action-works)
-7. [Plateforme E-Learning](#-plateforme-e-learning)
-8. [Système de Paiement / Payment System](#-système-de-paiement--payment-system)
-9. [API Endpoints](#-api-endpoints)
-10. [Base de Données / Database](#-base-de-données--database)
-11. [Authentification & Sécurité / Authentication & Security](#-authentification--sécurité--authentication--security)
-12. [Multilingue / Multilingual](#-multilingue--multilingual)
-13. [Structure du Projet / Project Structure](#-structure-du-projet--project-structure)
+A full-stack university management platform built for **ESL — École de Santé de Libreville**. It covers the entire academic lifecycle: student enrollment, grade management, scheduling, payments, and an integrated e-learning platform — all accessible through role-specific dashboards with bilingual support (French / English) and dark mode.
 
 ---
 
-## 🔑 Identifiants de Connexion / Login Credentials
+## Table of Contents
 
-### Comptes Administratifs / Administrative Accounts
-
-| Rôle / Role | Username | Password | Email |
-|-------------|----------|----------|-------|
-| **Administrateur / Admin** | `admin` | `admin123` | admin@esl.local |
-| **Finance** | `finance1` | `password123` | finance1@esl.local |
-| **Secrétariat / Registrar** | `registrar1` | `password123` | registrar1@esl.local |
-
-### Comptes Enseignants / Teacher Accounts
-
-| Username | Password | Email | Département |
-|----------|----------|-------|-------------|
-| `teacher_1` | `password` | teacher0@unilak.ac.ke | Biology |
-| `teacher_2` | `password` | teacher1@unilak.ac.ke | Immunology |
-| `teacher_3` | `password` | teacher2@unilak.ac.ke | Biology |
-| ... | `password` | ... | ... |
-| `teacher_15` | `password` | teacher14@unilak.ac.ke | Immunology |
-
-> **Note :** 15 enseignants créés. Username = `teacher_1` à `teacher_15`. Mot de passe = `password` pour tous.
-
-### Comptes Étudiants / Student Accounts`
-
-| Username | Password | Email | Département |
-|----------|----------|-------|-------------|
-| `student_1` | `password` | student0@unilak.ac.ke | Biology |
-| `student_2` | `password` | student1@unilak.ac.ke | Immunology |
-| `student_3` | `password` | student2@unilak.ac.ke | Biology |
-| ... | `password` | ... | ... |
-| `student_40` | `password` | student39@unilak.ac.ke | Immunology |
-
-> **Note :** 40 étudiants créés. Username = `student_1` à `student_40`. Mot de passe = `password` pour tous.
-
-### Comment se connecter / How to login
-
-1. Ouvrir `http://localhost:5173/login`
-2. Entrer le **Username** (ou l'**Email**) et le **Password**
-3. Cliquer sur **Sign In** / **Se Connecter**
-4. Vous serez redirigé vers le dashboard correspondant à votre rôle
+1. [Features Overview](#features-overview)
+2. [Tech Stack](#tech-stack)
+3. [System Architecture](#system-architecture)
+4. [Installation](#installation)
+5. [Login Credentials](#login-credentials)
+6. [Role-Based Modules](#role-based-modules)
+7. [Authentication & Security](#authentication--security)
+8. [E-Learning Platform](#e-learning-platform)
+9. [Finance & Payments](#finance--payments)
+10. [Database Schema](#database-schema)
+11. [API Reference](#api-reference)
+12. [Internationalization](#internationalization)
+13. [Project Structure](#project-structure)
+14. [Useful Commands](#useful-commands)
 
 ---
 
-## 🛠 Technologies Utilisées / Technologies Used
+## Features Overview
 
-### Frontend (Interface Utilisateur)
-
-| Technologie | Version | Rôle / Purpose |
-|------------|---------|----------------|
-| **React.js** | 18.2.0 | Bibliothèque UI principale / Main UI library |
-| **React DOM** | 18.2.0 | Rendu dans le navigateur / Browser rendering |
-| **React Router DOM** | 6.22.1 | Navigation et routing / Page navigation |
-| **Vite** | 5.1.4 | Build tool rapide / Fast build tool |
-| **Tailwind CSS** | 3.4.1 | Framework CSS utility-first / CSS styling |
-| **Framer Motion** | 11.0.5 | Animations fluides / Smooth animations |
-| **Axios** | 1.6.7 | Client HTTP pour requêtes API / HTTP client |
-| **Chart.js** | 4.4.1 | Graphiques et statistiques / Charts & stats |
-| **React-Chartjs-2** | 5.2.0 | Wrapper React pour Chart.js |
-| **@headlessui/react** | 1.7.18 | Composants UI accessibles / Accessible UI |
-| **@heroicons/react** | 2.1.1 | Icônes SVG / SVG icons |
-| **React Hot Toast** | 2.4.1 | Notifications toast / Toast notifications |
-| **date-fns** | 3.3.1 | Manipulation de dates / Date formatting |
-| **PostCSS** | 8.4.35 | Traitement CSS / CSS processing |
-| **Autoprefixer** | 10.4.17 | Préfixes navigateurs / Browser prefixes |
-| **ESLint** | 8.56.0 | Qualité du code / Code quality |
-
-### Backend (API & Logique Métier)
-
-| Technologie | Version | Rôle / Purpose |
-|------------|---------|----------------|
-| **PHP** | 8.1+ | Langage serveur / Server language |
-| **Laravel Framework** | 10.0 | Framework MVC API REST |
-| **Laravel Sanctum** | 3.2 | Authentification par tokens / Token auth |
-| **Eloquent ORM** | (Laravel) | Mapping objet-relationnel / Object-relational mapping |
-| **Guzzle HTTP** | 7.2 | Client HTTP pour requêtes externes / External HTTP |
-| **Laravel Tinker** | 2.8 | REPL interactif / Interactive REPL |
-| **Laravel Pint** | 1.0 | Formatage du code / Code formatting |
-| **PHPUnit** | 10.1 | Tests unitaires / Unit testing |
-| **Mockery** | 1.4.4 | Mocking pour tests / Test mocking |
-| **FakerPHP** | 1.9.1 | Génération de données / Data generation |
-
-### Base de Données / Database
-
-| Technologie | Version | Rôle / Purpose |
-|------------|---------|----------------|
-| **MySQL / MariaDB** | 8.0+ | Base de données relationnelle / Relational database |
-| **Migrations Laravel** | — | Gestion du schéma / Schema management |
-
-### E-Learning
-
-| Technologie | Rôle / Purpose |
-|------------|----------------|
-| **Laravel Storage** | Stockage fichiers (PDF, DOC, PPT) / File storage |
-| **File System + Symlinks** | Accès public sécurisé / Secure public access |
-| **JavaScript Timer** | Chronomètre quiz / Quiz timer |
-| **LocalStorage** | Sauvegarde temporaire réponses / Temp answer save |
-| **Multipart Form Data** | Upload fichiers multiples / Multi-file upload |
-| **WebRTC** (prévu) | Visioconférence / Video conferencing |
-
-### Sécurité / Security
-
-| Technologie | Rôle / Purpose |
-|------------|----------------|
-| **Laravel Sanctum** | Tokens API / API token auth |
-| **Bcrypt** | Hashage mots de passe / Password hashing |
-| **CSRF Protection** | Protection CSRF (API exempted) |
-| **CORS** | Cross-Origin Resource Sharing |
-| **Role Middleware** | Protection routes par rôle / Role-based routing |
-
-### Serveur & Outils / Server & Tools
-
-| Technologie | Rôle / Purpose |
-|------------|----------------|
-| **XAMPP / MAMP** | Serveur local / Local server |
-| **Composer** | Dépendances PHP / PHP dependencies |
-| **NPM** | Dépendances JS / JS dependencies |
-| **Apache / PHP-FPM** | Serveur HTTP / HTTP server |
+| Category | Highlights |
+|----------|-----------|
+| **Authentication** | Token-based (Sanctum), OTP 2FA via email, password reset with OTP |
+| **Academic** | LMD cycle (L1→M2→D3), semester tracking, tronc commun / spécialisation courses, enrollment, grades (CA + exam), attendance |
+| **Student Lifecycle** | Auto-enrollment, semester advancement, academic promotion (L3 → M), retake course tracking, transfer grades from other institutions |
+| **E-Learning** | Online sessions, document upload (PDF/DOC/PPT), interactive quizzes with timer, assignment submission & grading |
+| **Finance** | Fee types with level filters, installment plans, payment recording, student fee dashboard |
+| **Roles** | 5 roles: Admin, Registrar, Finance, Teacher, Student — each with dedicated dashboard and permissions |
+| **UI/UX** | Dark mode, French/English i18n, animated transitions (Framer Motion), responsive design |
+| **Charts** | Interactive dashboards with Chart.js (revenue, enrollments, grade distributions) |
+| **Chatbot** | AI assistant "Simon" accessible from all dashboards |
+| **Notifications** | In-app notification system for all roles |
 
 ---
 
-## 🏗 Architecture du Système / System Architecture
+## Tech Stack
+
+### Frontend
+
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| React.js | 18.2 | UI library |
+| React Router DOM | 6.22 | Client-side routing |
+| Vite | 5.1 | Build tool & dev server |
+| Tailwind CSS | 3.4 | Utility-first CSS |
+| Framer Motion | 11 | Animations |
+| Axios | 1.6 | HTTP client |
+| Chart.js + react-chartjs-2 | 4.4 / 5.2 | Charts & analytics |
+| @headlessui/react | 1.7 | Accessible UI primitives |
+| @heroicons/react | 2.1 | SVG icon set |
+| react-hot-toast | 2.4 | Toast notifications |
+| date-fns | 3.3 | Date formatting |
+
+### Backend
+
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| PHP | 8.1+ | Server language |
+| Laravel Framework | 10 | MVC framework & REST API |
+| Laravel Sanctum | 3.2 | API token authentication |
+| Eloquent ORM | — | Database abstraction |
+| Guzzle HTTP | 7.2 | External HTTP requests |
+| PHPUnit | 10.1 | Unit testing |
+
+### Database & Infrastructure
+
+| Technology | Purpose |
+|-----------|---------|
+| MySQL 8.0 / MariaDB 10.3+ | Relational database (30+ tables) |
+| Laravel Migrations | Schema versioning |
+| Laravel Storage + Symlinks | File storage for e-learning content |
+| SMTP (Gmail / MailHog) | Transactional email (OTP codes) |
+
+---
+
+## System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                       APPLICATION ESL                                │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────┐       ┌─────────────────┐       ┌────────────┐ │
-│  │    FRONTEND      │◄─────►│     BACKEND      │◄─────►│  DATABASE   │ │
-│  │   (React.js)     │ HTTP  │    (Laravel)     │  SQL  │  (MySQL)   │ │
-│  │                  │ API   │                  │      │            │ │
-│  │  Port: 5173      │       │  Port: 8000      │      │  30+ Tables│ │
-│  └─────────────────┘       └─────────────────┘       └────────────┘ │
-│        │                           │                        │       │
-│  [Vite + React]           [PHP + Laravel]           [MariaDB/MySQL] │
-│  Tailwind CSS             Sanctum Auth              Relations FK    │
-│  Axios HTTP               Controllers              Migrations      │
-│  React Router             Eloquent ORM              Seeders         │
-│  I18n (FR/EN)             Middleware                                 │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                  ESL Application                     │
+├──────────────────┬─────────────────┬────────────────┤
+│   FRONTEND       │    BACKEND      │   DATABASE     │
+│   React + Vite   │    Laravel 10   │   MySQL        │
+│   Port 5173      │    Port 8000    │   Port 3306    │
+│                  │                 │                │
+│  Axios + Proxy ──►  Sanctum Auth  ──►  Eloquent ORM │
+│  React Router    │  Role Middleware│  30+ Tables    │
+│  i18n (FR/EN)    │  REST API       │  Migrations    │
+│  Tailwind CSS    │  Mail (OTP)     │  Seeders       │
+└──────────────────┴─────────────────┴────────────────┘
 ```
 
-### Flux de Données / Data Flow
+### Request Flow
 
 ```
-UTILISATEUR / USER
-    ↓ (Clic, formulaire / Click, form)
-INTERFACE REACT (composant .jsx)
-    ↓ (api.get('/api/...') ou api.post('/api/...'))
-AXIOS HTTP CLIENT
-    ↓ (Ajoute token / Adds token: Authorization: Bearer {token})
-VITE DEV PROXY (localhost:5173 → localhost:8000)
-    ↓
-SERVEUR LARAVEL (localhost:8000)
-    ↓
-MIDDLEWARE SANCTUM (Vérifie token / Verifies token)
-    ↓
-MIDDLEWARE ROLE (Vérifie rôle / Verifies role: admin, student, teacher...)
-    ↓
-ROUTER LARAVEL (routes/api.php)
-    ↓
-CONTROLLER (Logique métier / Business logic)
-    ↓
-MODÈLE ELOQUENT (Query builder → SQL)
-    ↓
-BASE DE DONNÉES MySQL (SELECT, INSERT, UPDATE...)
-    ↓ Résultats / Results
-ELOQUENT (Convertit en objets PHP / Converts to PHP objects)
-    ↓
-CONTROLLER (return response()->json([...]))
-    ↓
-RÉPONSE HTTP JSON
-    ↓
-AXIOS (response.data)
-    ↓
-REACT (setState / useState)
-    ↓
-DOM (Affichage dans le navigateur / Browser display)
+User Action (click / form submit)
+  ↓
+React Component (JSX)
+  ↓
+Axios (adds Authorization: Bearer {token})
+  ↓
+Vite Proxy (localhost:5173 → localhost:8000)
+  ↓
+Laravel Router (routes/api.php)
+  ↓
+Sanctum Middleware (validates token)
+  ↓
+Role Middleware (checks user role)
+  ↓
+Controller (business logic)
+  ↓
+Eloquent Model (SQL query)
+  ↓
+JSON Response → React State → DOM Update
 ```
 
 ---
 
-## 🚀 Installation & Lancement / Installation & Startup
+## Installation
 
-### Prérequis / Prerequisites
+### Prerequisites
 
-- **PHP** 8.1+
-- **Composer** (gestionnaire dépendances PHP)
-- **Node.js** 18+ et **NPM**
-- **MySQL** 8.0+ ou **MariaDB** 10.3+
-- **XAMPP/MAMP** (optionnel)
+- PHP 8.1+
+- Composer
+- Node.js 18+ and NPM
+- MySQL 8.0+ or MariaDB 10.3+
 
-### 1. Backend (API Laravel)
+### 1. Clone the repository
 
 ```bash
-# Naviguer vers le backend
+git clone <repository-url>
+cd ESL2
+```
+
+### 2. Backend Setup
+
+```bash
 cd backend
 
-# Installer les dépendances PHP
+# Install PHP dependencies
 composer install
 
-# Copier le fichier d'environnement
-cp .env.example .env
+# Create environment file
+cp .env.example .env   # or manually create .env from the template below
 
-# Générer la clé d'application
+# Generate application key
 php artisan key:generate
-
-# Configurer la base de données dans .env :
-# DB_CONNECTION=mysql
-# DB_HOST=127.0.0.1
-# DB_PORT=3306
-# DB_DATABASE=esl_university
-# DB_USERNAME=root
-# DB_PASSWORD=
-
-# Créer la base de données
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS esl_university;"
-
-# Exécuter les migrations et remplir les données
-php artisan migrate:fresh --seed
-
-# Créer le lien symbolique pour les fichiers uploadés
-php artisan storage:link
-
-# Démarrer le serveur Laravel
-php artisan serve
-# → Accessible sur http://localhost:8000
 ```
 
-### 2. Frontend (React.js)
+**Configure `.env`:**
+
+```env
+APP_NAME="ESL University"
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=esl_university
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Email (OTP codes) — use Gmail App Password in production
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=xxxx-xxxx-xxxx-xxxx
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=your-email@gmail.com
+MAIL_FROM_NAME="ESL University"
+
+# For local development without email, use MailHog:
+# MAIL_MAILER=smtp
+# MAIL_HOST=127.0.0.1
+# MAIL_PORT=1025
+```
 
 ```bash
-# Dans un nouveau terminal
+# Create the database
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS esl_university;"
+
+# Run migrations and seed initial data
+php artisan migrate:fresh --seed
+
+# Create the symbolic link for file storage
+php artisan storage:link
+
+# Start the API server
+php artisan serve
+# → http://localhost:8000
+```
+
+### 3. Frontend Setup
+
+```bash
+# In a new terminal
 cd frontend
 
-# Installer les dépendances
+# Install JS dependencies
 npm install
 
-# Démarrer le serveur de développement
+# Start the development server
 npm run dev
-# → Accessible sur http://localhost:5173
+# → http://localhost:5173
 ```
 
-### 3. Vérification
+### 4. Verify Installation
 
-- Ouvrir **http://localhost:5173** dans le navigateur
-- Se connecter avec `admin` / `admin123`
-- Les deux serveurs doivent tourner en même temps
+Open **http://localhost:5173** and log in with `admin` / `admin123`. Both servers must be running simultaneously.
 
 ---
 
-## 👥 Rôles & Fonctionnalités / Roles & Features
+## Login Credentials
 
-### 1. Administrateur / Admin (`admin`)
+### Administrative Accounts
 
-| Fonctionnalité | Description |
-|----------------|-------------|
-| **Dashboard** | Vue globale : nombre d'étudiants, enseignants, cours, graphiques |
-| **Facultés** | Créer, modifier, supprimer des facultés |
-| **Départements** | Gérer les départements par faculté |
-| **Cours** | Créer/modifier des cours (code, nom, crédits, niveau LMD) |
-| **Classes** | Créer des classes, assigner enseignants et salles |
-| **Gestion Étudiants** | Recherche, profils, assignation de cours par étudiant |
-| **Gestion Enseignants** | Recherche, profils, assignation de cours par enseignant |
-| **Inscription Auto** | Inscrire en masse des étudiants dans leurs cours |
-| **Rapports** | Statistiques académiques et financières |
-| **Journal d'Activité** | Historique de toutes les actions système |
-| **Paramètres** | Thème, langue, notifications, widgets |
+| Role | Username | Password | Email |
+|------|----------|----------|-------|
+| Admin | `admin` | `admin123` | admin@esl.local |
+| Finance | `finance1` | `password123` | finance1@esl.local |
+| Registrar | `registrar1` | `password123` | registrar1@esl.local |
 
-### 2. Secrétariat / Registrar (`registrar1`)
+### Teacher Accounts
 
-| Fonctionnalité | Description |
-|----------------|-------------|
-| **Dashboard** | Statistiques d'inscriptions |
-| **Étudiants** | Créer, modifier, consulter les profils étudiants |
-| **Enseignants** | Créer, modifier, consulter les profils enseignants |
-| **Paramètres** | Personnalisation de l'interface |
+| Username | Password | Department |
+|----------|----------|------------|
+| `teacher_1` to `teacher_15` | `password` | Biology / Immunology |
 
-### 3. Finance (`finance1`)
+### Student Accounts
 
-| Fonctionnalité | Description |
-|----------------|-------------|
-| **Dashboard** | Revenus, paiements du jour, statistiques financières |
-| **Types de Frais** | Créer/modifier les catégories de frais (scolarité, labo, etc.) |
-| **Frais Étudiants** | Attribuer des frais aux étudiants |
-| **Paiements** | Enregistrer et consulter les paiements |
-| **Paramètres** | Personnalisation |
+| Username | Password | Department |
+|----------|----------|------------|
+| `student_1` to `student_40` | `password` | Biology / Immunology |
 
-### 4. Enseignant / Teacher (`teacher_1` à `teacher_15`)
-
-| Fonctionnalité | Description |
-|----------------|-------------|
-| **Dashboard** | Classes assignées, nombre d'étudiants |
-| **Mes Classes** | Voir les classes et étudiants inscrits |
-| **E-Learning** | Créer cours en ligne, documents, quiz, devoirs |
-| **Notes** | Saisir les notes (CA + Examen) |
-| **Présences** | Marquer les présences par séance |
-| **Emploi du Temps** | Consulter son planning |
-| **Paramètres** | Thème, langue, notifications |
-
-### 5. Étudiant / Student (`student_1` à `student_40`)
-
-| Fonctionnalité | Description |
-|----------------|-------------|
-| **Dashboard** | Cours inscrits, notes récentes, présences |
-| **Mes Cours** | Liste des cours où l'étudiant est inscrit |
-| **E-Learning** | Rejoindre cours live, télécharger docs, quiz, devoirs |
-| **Notes** | Consulter ses notes par cours |
-| **Présences** | Consulter son historique de présence |
-| **Emploi du Temps** | Voir son planning de cours |
-| **Frais** | Consulter le détail de ses frais (lecture seule) |
-| **Paiement** | Effectuer un paiement (carte bancaire, PayPal) |
-| **Paramètres** | Thème, langue, notifications |
+> **Note:** When OTP 2FA is enabled, users with a valid email address will receive a 6-digit code after entering their credentials. For demo accounts using local email addresses (`@esl.local`), OTP sending may fail — configure real SMTP credentials to fully test the 2FA flow.
 
 ---
 
-## 🔄 Comment Chaque Action Fonctionne / How Every Action Works
-
-### Connexion / Login
-
-```
-1. L'utilisateur saisit username + password sur /login
-2. Le frontend envoie POST /api/login { username, password }
-3. Laravel AuthController::login() :
-   - Cherche l'utilisateur par username OU email
-   - Vérifie le mot de passe avec Hash::check()
-   - Si OK : crée un token Sanctum, retourne { token, user, role }
-   - Si KO : retourne erreur 401
-4. Le frontend stocke le token dans localStorage
-5. Toutes les requêtes suivantes incluent le header :
-   Authorization: Bearer {token}
-6. Redirection vers /{role} (ex: /admin, /student, /teacher)
-```
-
-### Création d'un Étudiant (par Admin ou Registrar)
-
-```
-1. Admin va dans Gestion Étudiants → Nouveau
-2. Remplit le formulaire (nom, email, département, niveau)
-3. POST /api/students { first_name, last_name, email, department_id, level }
-4. StudentController::store() :
-   - Valide les données (required, unique email, exists department_id)
-   - Crée un User (role = 'student', password hashé)
-   - Crée un Student lié au User
-   - Retourne le profil complet
-5. Le frontend ajoute l'étudiant à la liste
-```
-
-### Assignation de Cours à un Étudiant
-
-```
-1. Admin ouvre le profil d'un étudiant
-2. Clique "Assigner un cours"
-3. Sélectionne le cours dans la liste
-4. POST /api/students/{id}/courses { course_id }
-5. Le backend :
-   - Trouve ou crée une classe pour ce cours
-   - Crée une inscription (Enrollment) student_id + class_id
-   - Ne duplique pas si déjà inscrit
-6. L'étudiant voit maintenant ce cours dans son tableau de bord
-```
-
-### Saisie de Notes (par l'Enseignant)
-
-```
-1. L'enseignant va dans Notes → Sélectionne une classe
-2. Voit la liste des étudiants inscrits
-3. Saisit les notes CA (Contrôle Continu) et Examen pour chaque étudiant
-4. POST /api/grades { enrollment_id, ca_score, exam_score }
-5. GradeController::store() :
-   - Valide les scores (0-100)
-   - Calcule la note finale (ca * 0.4 + exam * 0.6)
-   - Sauvegarde dans la table grades
-6. L'étudiant voit ses notes mises à jour dans Notes
-```
-
-### Marquage des Présences (par l'Enseignant)
-
-```
-1. L'enseignant va dans Présences → Sélectionne une classe et une date
-2. Coche chaque étudiant comme Présent / Absent / En retard
-3. POST /api/attendance { class_id, date, records: [{student_id, status}] }
-4. AttendanceController::store() :
-   - Crée un enregistrement par étudiant pour cette date
-   - Statut : present / absent / late / excused
-5. L'étudiant voit son historique de présence mis à jour
-```
-
-### Gestion des Frais (par Finance)
-
-```
-1. Finance crée les types de frais : POST /api/fee-types { name, amount }
-2. Finance attribue des frais aux étudiants : POST /api/student-fees { student_id, fee_type_id }
-3. L'étudiant voit ses frais dans la page Frais :
-   - Scolarité : 500,000 FCFA — Solde : 500,000 FCFA — Statut : Impayé
-4. Quand l'étudiant paie, le solde est mis à jour automatiquement
-```
-
-### Paiement par l'Étudiant
-
-```
-1. L'étudiant va dans Paiement
-2. Choisit la méthode : Carte bancaire ou PayPal
-3. Saisit le montant et les détails
-4. POST /api/payment/initialize { amount, payment_method, card_number... }
-5. PaymentController::initializePayment() :
-   - Crée une transaction (status = pending)
-   - Si un provider externe est configuré → redirige vers le provider
-   - Sinon → auto-confirme le paiement immédiatement
-   - Met à jour le statut de la transaction (completed)
-6. Le frontend affiche la confirmation
-7. L'historique de paiement et le solde des frais sont mis à jour
-```
-
-### E-Learning : Upload de Document (par l'Enseignant)
-
-```
-1. L'enseignant va dans E-Learning → Sélectionne un cours → Documents
-2. Clique "Uploader" → Choisit un fichier (PDF, DOC, PPT)
-3. POST /api/elearning/materials (multipart/form-data)
-   { course_id, title, description, file }
-4. ELearningController::uploadMaterial() :
-   - Vérifie que l'enseignant enseigne bien ce cours
-   - Valide le fichier (type, taille max 10MB)
-   - Stocke dans storage/app/public/materials/{course_id}/
-   - Crée l'enregistrement dans course_materials
-5. Les étudiants inscrits au cours voient le document et peuvent le télécharger
-```
-
-### E-Learning : Création de Quiz (par l'Enseignant)
-
-```
-1. L'enseignant va dans E-Learning → Quiz → Créer un quiz
-2. Remplit : titre, cours, durée, nombre de tentatives, score de passage
-3. Ajoute des questions :
-   - Question texte
-   - 4 options de réponse
-   - Marque la réponse correcte
-   - Points par question
-4. POST /api/elearning/quizzes { course_id, title, duration, questions: [...] }
-5. ELearningController::createQuiz() :
-   - Crée le quiz
-   - Crée les questions liées
-   - Statut : draft → publish pour rendre visible
-6. POST /api/elearning/quizzes/{id}/publish → quiz visible aux étudiants
-```
-
-### E-Learning : Passer un Quiz (par l'Étudiant)
-
-```
-1. L'étudiant va dans E-Learning → Quiz → Voit les quiz disponibles
-2. Clique "Commencer" → POST /api/elearning/quizzes/{id}/start
-3. Le backend crée un quiz_attempt (start_time = now)
-4. Le frontend affiche les questions avec un chronomètre
-5. L'étudiant répond aux questions
-6. POST /api/elearning/quizzes/attempt/{id}/submit { answers: [...] }
-7. Le backend :
-   - Compare chaque réponse à la bonne réponse
-   - Calcule le score total
-   - Marque la tentative comme complétée
-   - Détermine si réussi ou échoué (vs score de passage)
-8. L'étudiant voit immédiatement son résultat
-```
-
-### E-Learning : Devoir / Assignment
-
-```
-ENSEIGNANT :
-1. Crée un devoir : POST /api/elearning/assignments
-   { course_id, title, description, due_date, total_points }
-2. Publie le devoir → visible aux étudiants
-3. Consulte les soumissions : GET /api/elearning/assignments/{id}/submissions
-4. Télécharge et note : POST /api/elearning/assignments/submission/{id}/grade
-
-ÉTUDIANT :
-1. Voit les devoirs pour ses cours : GET /api/elearning/assignments/course/{id}
-2. Upload sa soumission : POST /api/elearning/assignments/{id}/submit
-   (fichier PDF/DOC + texte optionnel)
-3. Voit le statut : Soumis / En attente / En retard
-4. Reçoit la note et le feedback de l'enseignant
-```
-
-### Changement de Langue / Language Switch
-
-```
-1. L'utilisateur va dans Paramètres → Langue
-2. Clique sur 🇫🇷 Français ou 🇬🇧 English
-3. Le changement est IMMÉDIAT (pas besoin de sauvegarder)
-4. Le I18nProvider met à jour la langue globalement
-5. Tous les composants utilisant t('clé') se re-rendent
-6. Le choix est sauvegardé dans localStorage + serveur
-7. Au prochain chargement, la langue est restaurée
-```
-
-### Changement de Thème / Theme Switch
-
-```
-1. Cliquer sur l'icône 🌙/☀️ dans le header → toggle sombre/clair
-2. Ou aller dans Paramètres → Apparence → Clair / Sombre / Système
-3. La classe CSS 'dark' est ajoutée/retirée sur <html>
-4. Tailwind CSS applique les styles dark: automatiquement
-5. Préférence sauvegardée dans localStorage
-```
-
----
-
-## 🎓 Plateforme E-Learning
-
-### Vue d'Ensemble
-
-La plateforme e-learning permet aux enseignants de créer du contenu pédagogique et aux étudiants d'y accéder selon leurs inscriptions.
-
-### Modules E-Learning
-
-#### 1. Cours en Ligne (Online Courses)
-
-- **Enseignant** : Créer une session (live ou enregistrée), planifier date/heure, définir la durée
-- **Étudiant** : Rejoindre les sessions en direct, voir l'historique des cours
-- **Table BDD** : `online_courses`, `online_course_attendance`
-
-#### 2. Documents de Cours (Course Materials)
-
-- **Enseignant** : Uploader PDF, DOC, DOCX, PPT, PPTX, images. Ajouter titre + description.
-- **Étudiant** : Voir et télécharger les documents de ses cours
-- **Table BDD** : `course_materials`
-- **Stockage** : `/backend/storage/app/public/materials/{course_id}/`
-
-#### 3. Quiz Interactifs
-
-- **Enseignant** : Créer quiz avec questions à choix multiple, définir durée, tentatives max, score de passage, date limite
-- **Étudiant** : Passer le quiz avec chronomètre, soumettre, voir le score immédiatement
-- **Correction automatique** : Le système compare les réponses et calcule le score
-- **Tables BDD** : `quizzes`, `quiz_questions`, `quiz_attempts`
-
-#### 4. Devoirs (Assignments)
-
-- **Enseignant** : Créer avec instructions, date limite, points totaux. Voir les soumissions, noter.
-- **Étudiant** : Voir les devoirs, uploader fichier (PDF, DOC), voir statut de soumission
-- **Tables BDD** : `assignments`, `assignment_submissions`
-- **Stockage** : `/backend/storage/app/public/assignments/{assignment_id}/`
-
-### Contrôle d'Accès E-Learning
-
-- Les **enseignants** ne voient que les cours qu'ils enseignent
-- Les **étudiants** ne voient que les cours où ils sont inscrits
-- Vérification d'inscription avant chaque accès au contenu
-- Tous les fichiers sont protégés et accessibles uniquement aux utilisateurs autorisés
-
----
-
-## 💰 Système de Paiement / Payment System
-
-### Page Frais (Lecture seule / Read-only)
-
-L'étudiant consulte :
-- **Aperçu** : Total scolarité, montant payé, solde restant
-- **Détail** : Chaque type de frais avec montant, payé, solde, échéance, statut
-
-### Page Paiement (Action)
-
-L'étudiant peut payer par :
-- **Carte bancaire** (Visa / MasterCard)
-- **PayPal**
-
-Après paiement :
-- Transaction enregistrée dans `transactions`
-- Historique mis à jour
-- Solde des frais recalculé
-- Reçu disponible
-
-### Fournisseurs de Paiement (optionnel)
-
-Le système supporte l'intégration de :
-- **Paystack** (configurable via `.env`)
-- **Flutterwave** (configurable via `.env`)
-- **PayPal** (configurable via `.env`)
-
-> Si aucun fournisseur n'est configuré, les paiements sont **auto-confirmés** pour permettre les présentations/démos.
-
----
-
-## 🔌 API Endpoints
-
-### Authentification
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| POST | `/api/login` | Connexion (username + password) |
-| POST | `/api/logout` | Déconnexion (invalide le token) |
-| GET | `/api/me` | Informations utilisateur connecté |
-| PUT | `/api/profile` | Modifier le profil |
-| PUT | `/api/change-password` | Changer le mot de passe |
-
-### Dashboards
-
-| Méthode | Route | Rôle | Description |
-|---------|-------|------|-------------|
-| GET | `/api/dashboard/admin` | Admin | KPIs, statistiques globales |
-| GET | `/api/dashboard/student` | Student | Cours, notes, présences |
-| GET | `/api/dashboard/teacher` | Teacher | Classes, étudiants |
-| GET | `/api/dashboard/finance` | Finance | Revenus, paiements |
-| GET | `/api/dashboard/registrar` | Registrar | Inscriptions |
-
-### Ressources Académiques
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET/POST | `/api/faculties` | Lister / Créer facultés |
-| GET/POST | `/api/departments` | Lister / Créer départements |
-| GET/POST | `/api/courses` | Lister / Créer cours |
-| GET/POST | `/api/classes` | Lister / Créer classes |
-| GET/POST | `/api/students` | Lister / Créer étudiants |
-| GET/POST | `/api/teachers` | Lister / Créer enseignants |
-| GET/POST | `/api/enrollments` | Lister / Créer inscriptions |
-| GET/POST | `/api/grades` | Lister / Créer notes |
-| GET/POST | `/api/attendance` | Lister / Créer présences |
-
-### E-Learning
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET | `/api/elearning/courses/teacher` | Cours de l'enseignant |
-| GET | `/api/elearning/courses/student` | Cours de l'étudiant |
-| POST | `/api/elearning/courses` | Créer cours en ligne |
-| POST | `/api/elearning/courses/{id}/join` | Rejoindre un cours |
-| POST | `/api/elearning/materials` | Uploader document |
-| GET | `/api/elearning/materials/course/{id}` | Documents d'un cours |
-| GET | `/api/elearning/materials/{id}/download` | Télécharger document |
-| POST | `/api/elearning/quizzes` | Créer quiz |
-| GET | `/api/elearning/quizzes/course/{id}` | Quiz d'un cours |
-| POST | `/api/elearning/quizzes/{id}/start` | Démarrer quiz |
-| POST | `/api/elearning/quizzes/attempt/{id}/submit` | Soumettre quiz |
-| POST | `/api/elearning/assignments` | Créer devoir |
-| GET | `/api/elearning/assignments/course/{id}` | Devoirs d'un cours |
-| POST | `/api/elearning/assignments/{id}/submit` | Soumettre devoir |
-| GET | `/api/elearning/assignments/{id}/submissions` | Voir soumissions |
-| POST | `/api/elearning/assignments/submission/{id}/grade` | Noter devoir |
-
-### Paiements
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET | `/api/payment/summary` | Résumé des frais étudiant |
-| GET | `/api/payment/history` | Historique paiements |
-| POST | `/api/payment/initialize` | Initier un paiement |
-| GET | `/api/payment/status/{ref}` | Statut d'un paiement |
-| GET | `/api/payment/receipt/{id}` | Reçu de paiement |
+## Role-Based Modules
+
+### Admin
+
+| Module | Description |
+|--------|-------------|
+| Dashboard | Global KPIs: students, teachers, courses, revenue, enrollment charts |
+| Faculties | Create, edit, delete faculties |
+| Departments | Manage departments per faculty |
+| Courses | Create courses with code, name, level (L1–D3), semester, type (tronc commun / spécialisation), credits, weekly hours |
+| Classes | Create class groups, assign teachers and rooms |
+| Student Management | Full student profiles, course assignments, semester advancement, academic promotion, transfer grades |
+| Teacher Management | Full teacher profiles, course assignments |
+| Auto-Enrollment | Bulk enroll students into all courses matching their level and department |
+| Reports | Academic and financial statistics |
+| Activity Log | Full audit trail of all system actions |
+| Settings | Theme, language, notifications, dashboard widgets |
+
+### Registrar
+
+| Module | Description |
+|--------|-------------|
+| Dashboard | Enrollment statistics |
+| Students | Create, edit, view student profiles |
+| Teachers | Create, edit, view teacher profiles |
+| Users | Manage user accounts and status |
+| Settings | Interface preferences |
 
 ### Finance
 
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET/POST | `/api/fee-types` | Types de frais |
-| GET/POST | `/api/student-fees` | Frais étudiants |
-| GET/POST | `/api/payments` | Paiements (gestion finance) |
+| Module | Description |
+|--------|-------------|
+| Dashboard | Revenue, daily payments, financial charts |
+| Fee Types | Create fee categories (tuition, lab, library, etc.) with level and category filters |
+| Student Fees | Assign fees to students, configure installment plans |
+| Payments | Record cash/bank payments, edit records, view full history |
+| Settings | Interface preferences |
+
+### Teacher
+
+| Module | Description |
+|--------|-------------|
+| Dashboard | Assigned classes, student count |
+| My Classes | View enrolled students per class |
+| E-Learning | Create online sessions, upload documents, create quizzes, manage assignments |
+| Grades | Enter continuous assessment (CA) and exam scores; validate |
+| Attendance | Mark students present / absent / late per session |
+| Schedule | View personal timetable |
+| Settings | Theme, language, notifications |
+
+### Student
+
+| Module | Description |
+|--------|-------------|
+| Dashboard | Enrolled courses, recent grades, attendance summary |
+| E-Learning | Join live sessions, download documents, take quizzes, submit assignments |
+| Grades | View grades per course (CA, exam, final, pass/fail) |
+| Attendance | View attendance history per course |
+| Schedule | Personal course timetable |
+| Fees | View assigned fees, balance, installment plan (read-only) |
+| Payment | Pay fees online (card / PayPal) |
+| Settings | Theme, language, notifications |
 
 ---
 
-## 💾 Base de Données / Database
+## Authentication & Security
 
-### 30+ Tables organisées en groupes :
-
-#### Authentification & Utilisateurs
-| Table | Rôle |
-|-------|------|
-| `users` | Tous les utilisateurs (admin, finance, registrar, teacher, student) |
-| `personal_access_tokens` | Tokens Sanctum pour l'authentification |
-| `user_settings` | Préférences utilisateur (langue, thème) |
-
-#### Structure Académique
-| Table | Rôle |
-|-------|------|
-| `faculties` | Facultés (ex: Faculty of Sciences) |
-| `departments` | Départements (ex: Biology, Immunology) |
-| `courses` | Cours/matières (ex: BIO101 General Biology) |
-| `classes` | Classes/groupes (cours + enseignant + salle + semestre) |
-
-#### Personnes
-| Table | Rôle |
-|-------|------|
-| `students` | Profils étudiants (lié à users, department) |
-| `teachers` | Profils enseignants (lié à users, department) |
-
-#### Inscriptions & Suivi
-| Table | Rôle |
-|-------|------|
-| `enrollments` | Inscriptions (student + class) |
-| `grades` | Notes (CA + Examen + Final) |
-| `attendance` | Présences par séance |
-
-#### Finances
-| Table | Rôle |
-|-------|------|
-| `fee_types` | Catégories de frais (Scolarité, Labo, etc.) |
-| `student_fees` | Frais attribués aux étudiants |
-| `payments` | Paiements enregistrés par finance |
-| `transactions` | Transactions en ligne (paiements étudiants) |
-
-#### E-Learning
-| Table | Rôle |
-|-------|------|
-| `online_courses` | Sessions de cours en ligne |
-| `online_course_attendance` | Présence aux cours vidéo |
-| `course_materials` | Documents uploadés |
-| `quizzes` | Quiz créés |
-| `quiz_questions` | Questions des quiz |
-| `quiz_attempts` | Tentatives des étudiants |
-| `assignments` | Devoirs créés |
-| `assignment_submissions` | Soumissions des étudiants |
-
-#### Système
-| Table | Rôle |
-|-------|------|
-| `schedules` | Emplois du temps |
-| `announcements` | Annonces |
-| `activity_logs` | Journaux d'activité |
-| `chatbot_conversations` | Historique chatbot Simon |
-| `grade_modifications` | Historique modifications notes |
-| `course_equivalences` | Équivalences de cours (transferts) |
-
-### Relations Principales
+### Login Flow (with OTP 2FA)
 
 ```
-users (1) ──────► (1) students
-  │                     │
-  │                     ├──► (N) enrollments ◄──── (1) classes ◄──── (1) courses
-  │                     │           │
-  │                     │           ├──► (N) grades
-  │                     │           └──► (N) attendance
-  │                     │
-  │                     ├──► (N) student_fees ◄──── (1) fee_types
-  │                     └──► (N) transactions
-  │
-users (1) ──────► (1) teachers
-                        │
-                        ├──► (N) classes
-                        ├──► (N) online_courses
-                        ├──► (N) quizzes
-                        └──► (N) assignments
+1. User submits username + password on /login
+2. Backend validates credentials (username OR email)
+3. If valid → generates 6-digit OTP → sends to user email
+4. Backend responds: { status: "otp_required", email: "a***@gmail.com" }
+5. Frontend shows OTP entry form (step 2)
+6. User enters the code → POST /api/verify-login-otp
+7. Backend verifies: not expired (10 min), not already used
+8. If valid → marks OTP as used → returns Sanctum token + user info
+9. Frontend stores token in localStorage
+10. All subsequent requests include: Authorization: Bearer {token}
+11. Redirect to /{role} dashboard
 ```
 
----
+### Password Reset Flow
 
-## 🔐 Authentification & Sécurité / Authentication & Security
+```
+1. User clicks "Forgot password?" on Login page
+2. Enters email → POST /api/forgot-password
+3. Backend generates OTP → sends to email
+4. User enters OTP code → step 3
+5. User enters new password + confirmation → POST /api/reset-password
+6. Backend verifies OTP, updates password (bcrypt hashed)
+7. User can log in with new credentials
+```
 
-### Comment fonctionne l'authentification / How auth works
+### OTP Security Rules
 
-1. **Login** : POST `/api/login` avec `username` + `password`
-2. **Vérification** : Laravel cherche l'utilisateur, vérifie le mot de passe avec `Hash::check()`
-3. **Token** : Si OK, génère un token Sanctum unique
-4. **Stockage** : Token stocké dans la table `personal_access_tokens`
-5. **Frontend** : Token sauvegardé dans `localStorage`
-6. **Requêtes** : Chaque requête inclut `Authorization: Bearer {token}`
-7. **Middleware** : `auth:sanctum` vérifie le token à chaque requête protégée
-8. **Rôle** : Le middleware `role:admin` (ou student, teacher...) vérifie le rôle
+- **Expiry**: 10 minutes from creation
+- **Single use**: Marked as `used_at` after first successful verification
+- **Invalidation**: Old OTPs of the same type are invalidated when a new one is requested
+- **Resend**: Available via `POST /api/resend-otp`
 
-### Sécurité des Mots de Passe
-
-- **Hashage Bcrypt** : Mot de passe jamais stocké en clair
-- `Hash::make('password')` → `$2y$12$...` (hash irréversible)
-- `Hash::check('password', $hash)` → true/false
-
-### Protection des Routes (api.php)
+### Route Protection
 
 ```php
-// Route publique (pas de token requis)
-Route::post('/login', [AuthController::class, 'login']);
+// Public — no token required
+Route::post('/login', ...);
+Route::post('/verify-login-otp', ...);
+Route::post('/forgot-password', ...);
+Route::post('/reset-password', ...);
 
-// Route protégée (token requis)
+// Authenticated — token required (all roles)
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/me', ...);
+    Route::put('/profile', ...);
 });
 
-// Route protégée par rôle (token + rôle admin requis)
+// Role-restricted — token + specific role required
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::resource('faculties', FacultyController::class);
 });
 ```
 
----
+### Password Security
 
-## 🌍 Multilingue / Multilingual
-
-### Langues supportées / Supported Languages
-
-- 🇫🇷 **Français** (par défaut)
-- 🇬🇧 **English**
-
-### Comment ça marche / How it works
-
-Le système utilise un **I18nProvider** (React Context) qui :
-
-1. Charge les traductions depuis `src/locales/fr.json` et `src/locales/en.json`
-2. Expose une fonction `t('clé')` qui retourne le texte traduit
-3. Tous les composants utilisent `t('clé')` au lieu de texte en dur
-4. Le changement de langue est **instantané** (pas de rechargement)
-5. La préférence est sauvegardée dans `localStorage` et sur le serveur
-
-### Où changer la langue / Where to change language
-
-- **Page de connexion** : Bouton FR/EN en haut à droite
-- **Paramètres** : Section "Langue" avec drapeaux 🇫🇷 / 🇬🇧
-
-### Composants traduits / Translated components
-
-- Page de connexion (Login)
-- Barre latérale / Sidebar (tous les menus)
-- En-tête / Header (tooltips)
-- Page des paramètres / Settings
-- Labels de rôle (Administrateur, Enseignant, Étudiant...)
+- All passwords hashed with **bcrypt** (`Hash::make()`)
+- Passwords never stored or returned in plaintext
+- `Hash::check()` used for verification
 
 ---
 
-## 📁 Structure du Projet / Project Structure
+## E-Learning Platform
+
+### Modules
+
+#### Online Courses (Live Sessions)
+
+- Teachers create sessions with title, URL (Zoom/Meet link), scheduled date/time, duration
+- Students join directly from their dashboard
+- Attendance tracked automatically on join
+- **Tables**: `online_courses`, `online_course_attendance`
+
+#### Course Materials (Documents)
+
+- Teachers upload PDF, DOC, DOCX, PPT, PPTX (max 10 MB per file)
+- Files stored in `storage/app/public/materials/{course_id}/`
+- Students download from their enrolled course page
+- **Table**: `course_materials`
+
+#### Interactive Quizzes
+
+- Teachers create quizzes with: title, duration (minutes), max attempts, passing score, deadline
+- Questions: multiple-choice with 4 options, points per question, correct answer
+- Students take quizzes with a countdown timer; answers saved in localStorage as backup
+- **Automatic grading**: backend compares answers and calculates the score instantly
+- **Tables**: `quizzes`, `quiz_questions`, `quiz_attempts`
+
+#### Assignments
+
+- Teachers create assignments with instructions, due date, and total points
+- Students upload their work (PDF, DOC) before the deadline
+- Teachers download submissions, grade them, and add feedback
+- **Tables**: `assignments`, `assignment_submissions`
+
+### Access Control
+
+- Teachers see only courses they are assigned to teach
+- Students see only courses they are enrolled in
+- All content access is verified against enrollment records before serving files
+
+---
+
+## Finance & Payments
+
+### Fee Management (Finance role)
+
+1. **Create Fee Types**: name, amount, category (tuition, lab, library…), academic level
+2. **Assign Fees to Students**: link a fee type to a student; optionally configure an installment plan (monthly or quarterly, number of installments)
+3. **Record Payments**: cash or bank transfer payments recorded manually by finance staff
+4. **Track Balances**: each student fee shows total amount, amount paid, and remaining balance
+
+### Student Payment (Student role)
+
+- Students view their fee summary (total, paid, balance) and installment schedule
+- Online payment via **credit card** (Visa/MasterCard) or **PayPal**
+- Transactions stored in the `transactions` table with status tracking
+- Payment history available with receipts
+
+> If no external payment provider is configured, payments are **auto-confirmed** for demonstration purposes.
+
+---
+
+## Database Schema
+
+### 30+ Tables organized by domain:
+
+#### Users & Authentication
+| Table | Description |
+|-------|-------------|
+| `users` | All users (admin, registrar, finance, teacher, student) with role, status |
+| `personal_access_tokens` | Sanctum API tokens |
+| `user_settings` | Per-user preferences (language, theme, widgets) |
+| `otp_codes` | OTP codes for 2FA login and password reset |
+
+#### Academic Structure
+| Table | Description |
+|-------|-------------|
+| `faculties` | Top-level faculties |
+| `departments` | Departments under faculties |
+| `courses` | Courses with level (L1–D3), semester, type, credits, hours/week |
+| `classes` | Class groups (course + teacher + room + academic year) |
+
+#### People
+| Table | Description |
+|-------|-------------|
+| `students` | Student profiles (linked to `users` and `departments`) |
+| `teachers` | Teacher profiles (linked to `users` and `departments`) |
+
+#### Academic Tracking
+| Table | Description |
+|-------|-------------|
+| `enrollments` | Student–class registrations (status: active, completed, transfer, retake) |
+| `grades` | CA score, exam score, final score, validated flag |
+| `attendance` | Per-session attendance records (present / absent / late / excused) |
+| `grade_modifications` | Audit log of grade changes |
+| `course_equivalences` | Transfer grades from other institutions |
+
+#### Finance
+| Table | Description |
+|-------|-------------|
+| `fee_types` | Fee categories with amount, level, category |
+| `student_fees` | Fees assigned to students with installment plan config |
+| `payments` | Finance-recorded payments |
+| `transactions` | Student online payment transactions |
+
+#### E-Learning
+| Table | Description |
+|-------|-------------|
+| `online_courses` | Live/recorded session metadata |
+| `online_course_attendance` | Attendance for online sessions |
+| `course_materials` | Uploaded documents |
+| `quizzes` | Quiz definitions |
+| `quiz_questions` | Questions with options and correct answers |
+| `quiz_attempts` | Student attempts with scores |
+| `assignments` | Assignment definitions |
+| `assignment_submissions` | Student file submissions with grades |
+
+#### System
+| Table | Description |
+|-------|-------------|
+| `schedules` | Weekly timetable entries |
+| `announcements` | System-wide or role-specific announcements |
+| `activity_logs` | Full audit trail (who, what, when) |
+| `notifications` | In-app notification records |
+| `chatbot_conversations` | AI assistant conversation history |
+
+### Key Relations
+
+```
+users ──► students ──► enrollments ──► classes ──► courses
+                   ├──► grades (per enrollment)
+                   ├──► attendance (per enrollment)
+                   ├──► student_fees ──► fee_types
+                   └──► transactions
+
+users ──► teachers ──► classes
+                   ├──► online_courses
+                   ├──► quizzes
+                   └──► assignments
+```
+
+---
+
+## API Reference
+
+### Public Routes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/login` | Authenticate with username + password |
+| POST | `/api/verify-login-otp` | Verify OTP and receive token |
+| POST | `/api/resend-otp` | Resend OTP code |
+| POST | `/api/forgot-password` | Request password reset OTP |
+| POST | `/api/reset-password` | Reset password with OTP |
+| GET | `/api/settings/public` | Public app settings |
+
+### Auth (all authenticated users)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/logout` | Invalidate token |
+| GET | `/api/me` | Current user info |
+| PUT | `/api/profile` | Update profile & photo |
+| PUT | `/api/change-password` | Change password |
+
+### Dashboards
+
+| Method | Endpoint | Role |
+|--------|----------|------|
+| GET | `/api/dashboard/admin` | Admin |
+| GET | `/api/dashboard/student` | Student |
+| GET | `/api/dashboard/teacher` | Teacher |
+| GET | `/api/dashboard/finance` | Finance |
+| GET | `/api/dashboard/registrar` | Registrar |
+
+### Academic Resources
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/faculties` | List / create faculties |
+| GET/POST | `/api/departments` | List / create departments |
+| GET/POST | `/api/courses` | List / create courses |
+| GET/POST | `/api/classes` | List / create classes |
+| GET/POST | `/api/students` | List / create students |
+| GET/POST | `/api/teachers` | List / create teachers |
+| GET/POST | `/api/enrollments` | List / create enrollments |
+| GET/POST | `/api/grades` | List / record grades |
+| GET/POST | `/api/attendance` | List / record attendance |
+| GET/POST | `/api/schedules` | List / create schedule entries |
+
+### E-Learning
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/elearning/courses/teacher` | Teacher's online courses |
+| GET | `/api/elearning/courses/student` | Student's online courses |
+| POST | `/api/elearning/courses` | Create online session |
+| POST | `/api/elearning/courses/{id}/join` | Student joins a session |
+| POST | `/api/elearning/materials` | Upload document |
+| GET | `/api/elearning/materials/course/{id}` | List documents for a course |
+| GET | `/api/elearning/materials/{id}/download` | Download a document |
+| POST | `/api/elearning/quizzes` | Create quiz |
+| GET | `/api/elearning/quizzes/course/{id}` | List quizzes for a course |
+| POST | `/api/elearning/quizzes/{id}/start` | Start quiz attempt |
+| POST | `/api/elearning/quizzes/attempt/{id}/submit` | Submit quiz answers |
+| POST | `/api/elearning/assignments` | Create assignment |
+| GET | `/api/elearning/assignments/course/{id}` | List assignments for a course |
+| POST | `/api/elearning/assignments/{id}/submit` | Submit assignment file |
+| GET | `/api/elearning/assignments/{id}/submissions` | View all submissions (teacher) |
+| POST | `/api/elearning/assignments/submission/{id}/grade` | Grade a submission |
+
+### Finance
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/fee-types` | List / create fee types |
+| GET/POST | `/api/student-fees` | List / assign fees to students |
+| GET/POST | `/api/payments` | List / record payments |
+| GET | `/api/payment/summary` | Student fee summary |
+| GET | `/api/payment/history` | Student payment history |
+| POST | `/api/payment/initialize` | Initiate online payment |
+
+---
+
+## Internationalization
+
+The app supports **French** (default) and **English** with instant switching — no page reload required.
+
+### How it works
+
+- Translation files: `frontend/src/locales/fr.json` and `en.json`
+- `I18nProvider` (React Context) loads the active language on startup
+- All components use the `useI18n()` hook: `const { t } = useI18n()`
+- Every user-visible string is rendered as `t('key')` — no hardcoded text
+- Language preference is saved to `localStorage` and synced with the server (`user_settings`)
+
+### Where to switch language
+
+- **Login page**: FR / EN toggle button (top-right)
+- **Settings page**: Language section with flag icons
+
+---
+
+## Project Structure
 
 ```
 ESL2/
-├── backend/                          # API Laravel
+├── backend/                          # Laravel REST API
 │   ├── app/
 │   │   ├── Http/
-│   │   │   ├── Controllers/Api/     # Tous les contrôleurs API
-│   │   │   │   ├── AuthController.php          # Login, logout, profil
-│   │   │   │   ├── AdminController.php         # Dashboard admin
-│   │   │   │   ├── StudentController.php       # CRUD étudiants
-│   │   │   │   ├── TeacherController.php       # CRUD enseignants
-│   │   │   │   ├── PaymentController.php       # Paiements étudiants
-│   │   │   │   ├── ELearningController.php     # E-Learning complet
-│   │   │   │   ├── FacultyController.php       # Facultés
-│   │   │   │   ├── DepartmentController.php    # Départements
-│   │   │   │   ├── CourseController.php        # Cours
-│   │   │   │   ├── ClassController.php         # Classes
-│   │   │   │   ├── EnrollmentController.php    # Inscriptions
-│   │   │   │   ├── GradeController.php         # Notes
-│   │   │   │   ├── AttendanceController.php    # Présences
-│   │   │   │   └── ...
+│   │   │   ├── Controllers/Api/      # All API controllers
+│   │   │   │   ├── AuthController.php          # Login, OTP, logout, profile
+│   │   │   │   ├── StudentController.php       # Student CRUD + promotion
+│   │   │   │   ├── TeacherController.php       # Teacher CRUD
+│   │   │   │   ├── CourseController.php        # Course CRUD
+│   │   │   │   ├── ClassController.php         # Class management
+│   │   │   │   ├── GradeController.php         # Grade entry & validation
+│   │   │   │   ├── AttendanceController.php    # Attendance tracking
+│   │   │   │   ├── ELearningController.php     # Full e-learning module
+│   │   │   │   ├── PaymentController.php       # Student online payments
+│   │   │   │   ├── DashboardController.php     # Role-specific dashboards
+│   │   │   │   ├── RegistrarController.php     # Registrar operations
+│   │   │   │   ├── AdminController.php         # Admin operations
+│   │   │   │   └── NotificationController.php
 │   │   │   └── Middleware/
-│   │   │       ├── RoleMiddleware.php          # Vérification du rôle
-│   │   │       ├── VerifyCsrfToken.php         # CSRF (api/* exempté)
-│   │   │       └── ...
-│   │   ├── Models/                  # Modèles Eloquent
-│   │   │   ├── User.php
-│   │   │   ├── Student.php
-│   │   │   ├── Teacher.php
-│   │   │   ├── Transaction.php
-│   │   │   ├── Quiz.php
-│   │   │   └── ...
-│   │   └── Providers/
-│   ├── config/
-│   │   ├── cors.php                 # Configuration CORS
-│   │   ├── sanctum.php              # Configuration Sanctum
-│   │   └── services.php             # Clés API (Paystack, PayPal...)
+│   │   │       └── RoleMiddleware.php          # Role-based route guard
+│   │   ├── Mail/
+│   │   │   └── OtpMail.php                     # OTP email template
+│   │   └── Models/                             # Eloquent models
+│   │       ├── User.php, Student.php, Teacher.php
+│   │       ├── Course.php, Class.php, Enrollment.php
+│   │       ├── Grade.php, Attendance.php
+│   │       ├── FeeType.php, StudentFee.php, Payment.php
+│   │       ├── OtpCode.php                     # OTP model
+│   │       └── ...
 │   ├── database/
-│   │   ├── migrations/              # 30+ migrations
+│   │   ├── migrations/               # 50+ versioned migrations
 │   │   └── seeders/
-│   │       └── DatabaseSeeder.php   # Données initiales
+│   │       └── DatabaseSeeder.php    # Initial data (users, students, courses…)
 │   ├── routes/
-│   │   └── api.php                  # Toutes les routes API
+│   │   └── api.php                   # All API route definitions
 │   ├── storage/app/public/
-│   │   ├── materials/               # Documents e-learning
-│   │   └── assignments/             # Soumissions devoirs
-│   └── .env                         # Configuration environnement
+│   │   ├── materials/                # E-learning documents
+│   │   ├── assignments/              # Assignment submissions
+│   │   └── profile-images/          # User avatars
+│   └── .env                          # Environment configuration
 │
-├── frontend/                         # Application React
-│   ├── src/
-│   │   ├── components/              # Composants réutilisables
-│   │   │   └── Chatbot.jsx          # Chatbot Simon IA
-│   │   ├── context/                 # React Context API
-│   │   │   ├── AuthContext.jsx      # Authentification globale
-│   │   │   └── ThemeContext.jsx     # Thème sombre/clair
-│   │   ├── i18n/                    # Internationalisation
-│   │   │   └── index.jsx           # I18nProvider + useI18n hook
-│   │   ├── locales/                 # Fichiers de traduction
-│   │   │   ├── en.json             # English translations
-│   │   │   └── fr.json             # French translations
-│   │   ├── layouts/
-│   │   │   └── DashboardLayout.jsx # Layout principal (sidebar, header)
-│   │   ├── pages/
-│   │   │   ├── Login.jsx           # Page de connexion
-│   │   │   ├── Settings.jsx        # Paramètres (tous rôles)
-│   │   │   ├── admin/              # Pages admin
-│   │   │   │   ├── Dashboard.jsx
-│   │   │   │   ├── UnifiedStudentManagement.jsx
-│   │   │   │   ├── UnifiedTeacherManagement.jsx
-│   │   │   │   └── ...
-│   │   │   ├── student/            # Pages étudiant
-│   │   │   │   ├── Dashboard.jsx
-│   │   │   │   ├── ELearning.jsx
-│   │   │   │   ├── Fees.jsx
-│   │   │   │   ├── Payment.jsx
-│   │   │   │   └── ...
-│   │   │   ├── teacher/            # Pages enseignant
-│   │   │   │   ├── Dashboard.jsx
-│   │   │   │   ├── ELearning.jsx
-│   │   │   │   └── ...
-│   │   │   ├── finance/            # Pages finance
-│   │   │   └── registrar/          # Pages secrétariat
-│   │   ├── services/
-│   │   │   └── api.js              # Client Axios + intercepteurs
-│   │   ├── App.jsx                 # Routeur principal
-│   │   ├── main.jsx                # Point d'entrée React
-│   │   └── index.css               # Styles Tailwind globaux
-│   ├── public/
-│   │   └── esl-logo.png            # Logo ESL
-│   ├── package.json
-│   ├── vite.config.js              # Config Vite + proxies API
-│   └── tailwind.config.js          # Config Tailwind CSS
-│
-└── README.md                        # Ce fichier
+└── frontend/                         # React + Vite SPA
+    ├── public/
+    │   └── esl-logo.png              # App favicon & logo
+    └── src/
+        ├── components/               # Reusable UI components
+        │   ├── DataTable.jsx         # Sortable, searchable table
+        │   ├── Modal.jsx             # Dialog component
+        │   └── Chatbot.jsx           # AI assistant "Simon"
+        ├── context/
+        │   ├── AuthContext.jsx       # Global auth state + OTP flow
+        │   └── ThemeContext.jsx      # Dark/light mode
+        ├── i18n/
+        │   └── index.jsx             # I18nProvider + useI18n hook
+        ├── locales/
+        │   ├── en.json               # English translations
+        │   └── fr.json               # French translations
+        ├── layouts/
+        │   └── DashboardLayout.jsx   # Sidebar + header shell
+        ├── pages/
+        │   ├── Login.jsx             # Login + OTP step 2
+        │   ├── ForgotPassword.jsx    # Password reset (email → OTP → new password)
+        │   ├── Profile.jsx           # User profile page
+        │   ├── Settings.jsx          # App settings (all roles)
+        │   ├── admin/                # Admin pages
+        │   ├── student/              # Student pages
+        │   ├── teacher/              # Teacher pages
+        │   ├── finance/              # Finance pages
+        │   └── registrar/            # Registrar pages
+        ├── services/
+        │   └── api.js                # Axios instance + all API wrappers
+        ├── App.jsx                   # Route definitions
+        └── main.jsx                  # App entry point
 ```
 
 ---
 
-## 🤖 Chatbot Simon
-
-Assistant IA intégré accessible depuis tous les dashboards.
-
-- **Accès** : Bouton flottant en bas à droite
-- **Fonctionnalités** : Réponses contextuelles selon le rôle, recherche d'étudiants (admin), consultation notes
-- **Historique** : Conversations sauvegardées dans `chatbot_conversations`
-
----
-
-## 📝 Notes Importantes / Important Notes
-
-### Développement / Development
-- **Frontend** : Hot reload avec Vite (modifications instantanées)
-- **Backend** : Redémarrage automatique après modifications PHP
-- Les deux serveurs doivent tourner en même temps
-
-### Commandes Utiles / Useful Commands
+## Useful Commands
 
 ```bash
-# Réinitialiser la base de données avec données fraîches
+# Reset database with fresh seed data
 cd backend && php artisan migrate:fresh --seed
 
-# Vider les caches Laravel
-cd backend && php artisan config:clear && php artisan cache:clear
+# Clear all Laravel caches
+cd backend && php artisan config:clear && php artisan cache:clear && php artisan route:clear
 
-# Build frontend pour production
+# Regenerate storage symlink
+cd backend && php artisan storage:link
+
+# Build frontend for production
 cd frontend && npm run build
+
+# Preview production build locally
+cd frontend && npm run preview
+
+# Run backend tests
+cd backend && php artisan test
+
+# Format PHP code
+cd backend && ./vendor/bin/pint
 ```
 
 ---
 
-© 2026 ESL - École de Santé de Libreville. Tous droits réservés / All rights reserved.
+## Notes
 
-**Version :** 1.0.0  
-**Dernière mise à jour / Last updated :** Février 2026
+- Both servers (`php artisan serve` and `npm run dev`) must run simultaneously during development
+- Vite proxies all `/api` requests to `http://localhost:8000` (configured in `vite.config.js`)
+- For OTP email in production, create a **Gmail App Password** (Google Account → Security → 2-Step Verification → App Passwords) and set it in `.env`
+- For local development without real email, use **MailHog** (`MAIL_HOST=127.0.0.1`, `MAIL_PORT=1025`)
+- If no payment provider keys are set in `.env`, online payments are auto-confirmed (suitable for demos)
+
+---
+
+© 2026 ESL — École de Santé de Libreville. All rights reserved.
+
+**Version:** 1.1.0 | **Last updated:** March 2026

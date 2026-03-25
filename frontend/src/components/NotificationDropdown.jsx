@@ -78,7 +78,7 @@ export default function NotificationDropdown({ t }) {
       setNotifications(response.data.notifications || [])
       setUnreadCount(response.data.unread_count || 0)
     } catch (error) {
-      console.error('Failed to fetch notifications:', error)
+      // silent
     } finally {
       setLoading(false)
     }
@@ -131,7 +131,7 @@ export default function NotificationDropdown({ t }) {
               <div className="flex items-center gap-2">
                 <BellIcon className="w-5 h-5 text-primary-500" />
                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                  Notifications
+                  {t?.('notifications') || 'Notifications'}
                 </h3>
                 {unreadCount > 0 && (
                   <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium rounded-full">
@@ -152,16 +152,16 @@ export default function NotificationDropdown({ t }) {
               {loading && notifications.length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Chargement...</p>
+                  <p className="text-sm text-gray-500">{t?.('loading') || 'Chargement...'}</p>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="p-8 text-center">
                   <BellIcon className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Aucune notification
+                    {t?.('no_notifications') || 'Aucune notification'}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Vous êtes à jour !
+                    {t?.('up_to_date') || 'Vous êtes à jour !'}
                   </p>
                 </div>
               ) : (
@@ -212,7 +212,7 @@ export default function NotificationDropdown({ t }) {
                   onClick={fetchNotifications}
                   className="w-full text-center text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors"
                 >
-                  Rafraîchir
+                  {t?.('refresh') || 'Rafraîchir'}
                 </button>
               </div>
             )}

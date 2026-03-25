@@ -4,6 +4,7 @@ import { Bar } from 'react-chartjs-2'
 import { dashboardApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
 import { useI18n } from '../../i18n/index.jsx'
+import { useWidgetSettings } from '../../hooks/useWidgetSettings'
 import { UserGroupIcon, UsersIcon, CalendarIcon, PlusCircleIcon, ShieldCheckIcon, CurrencyDollarIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom'
 
@@ -11,6 +12,7 @@ export default function RegistrarDashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const { t } = useI18n()
+  const showWidget = useWidgetSettings()
 
   useEffect(() => {
     fetchStats()
@@ -20,8 +22,7 @@ export default function RegistrarDashboard() {
     try {
       const response = await dashboardApi.getRegistrarStats()
       setStats(response.data.data)
-    } catch (error) {
-      console.error('Failed to fetch stats:', error)
+    } catch (_) {
     } finally {
       setLoading(false)
     }
@@ -56,12 +57,14 @@ export default function RegistrarDashboard() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title={t('total_students')} value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
-        <StatCard title={t('active_students')} value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
-        <StatCard title={t('total_teachers')} value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
-        <StatCard title={t('new_this_month')} value={stats?.stats?.new_this_month || 0} icon={CalendarIcon} color="orange" delay={0.3} />
-      </div>
+      {showWidget('stats') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard title={t('total_students')} value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
+          <StatCard title={t('active_students')} value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
+          <StatCard title={t('total_teachers')} value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
+          <StatCard title={t('new_this_month')} value={stats?.stats?.new_this_month || 0} icon={CalendarIcon} color="orange" delay={0.3} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
@@ -98,23 +101,25 @@ export default function RegistrarDashboard() {
         </motion.div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('recent_registrations')}</h3>
-        <div className="space-y-4">
-          {stats?.recent_students?.map((student) => (
-            <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-medium">
-                {student.user?.first_name?.[0]}{student.user?.last_name?.[0]}
+      {showWidget('new_registrations') && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('recent_registrations')}</h3>
+          <div className="space-y-4">
+            {stats?.recent_students?.map((student) => (
+              <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-medium">
+                  {student.user?.first_name?.[0]}{student.user?.last_name?.[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 dark:text-white truncate">{student.user?.first_name} {student.user?.last_name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{student.department?.name} - {student.level}</p>
+                </div>
+                <span className="badge badge-info">{student.student_id}</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 dark:text-white truncate">{student.user?.first_name} {student.user?.last_name}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{student.department?.name} - {student.level}</p>
-              </div>
-              <span className="badge badge-info">{student.student_id}</span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
     </div>
   )
 }

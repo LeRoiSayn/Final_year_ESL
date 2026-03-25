@@ -14,6 +14,7 @@ class Student extends Model
         'department_id',
         'student_id',
         'level',
+        'current_semester',
         'enrollment_date',
         'guardian_name',
         'guardian_phone',

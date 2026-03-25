@@ -368,6 +368,7 @@ const StudentELearning = () => {
   // completedResults: { [quizId]: resultData } — persists within the session
   const [completedResults, setCompletedResults] = useState({});
   const [showSubmissionModal, setShowSubmissionModal] = useState(null);
+  const [showViewSubmissionModal, setShowViewSubmissionModal] = useState(null);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -400,8 +401,7 @@ const StudentELearning = () => {
           setEnrolledCourses([]);
         }
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (_) {
     } finally {
       setIsLoading(false);
     }
@@ -609,6 +609,12 @@ const StudentELearning = () => {
           </div>
 
           <div className="p-5 space-y-4">
+            {assignment.description && (
+              <div className="p-3 bg-gray-50 dark:bg-dark-200 rounded-xl">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t("elearning_instructions")}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{assignment.description}</p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t("elearning_comment_answer")}
@@ -1141,7 +1147,7 @@ const StudentELearning = () => {
                             <h3 className="font-semibold text-gray-900 dark:text-white">
                               {assignment.title}
                             </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                               {assignment.description}
                             </p>
                             <div className="flex items-center gap-4 mt-3 text-sm">
@@ -1186,7 +1192,10 @@ const StudentELearning = () => {
                                 : t("elearning_submit")}
                             </button>
                           ) : hasSubmitted ? (
-                            <button className="px-4 py-2 bg-gray-100 dark:bg-dark-200 text-gray-600 dark:text-gray-400 rounded-lg text-sm font-medium">
+                            <button
+                              onClick={() => setShowViewSubmissionModal({ assignment, submission: hasSubmitted })}
+                              className="px-4 py-2 bg-gray-100 dark:bg-dark-200 text-gray-600 dark:text-gray-400 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-dark-100 transition-colors"
+                            >
                               {t("elearning_view_submission")}
                             </button>
                           ) : (
@@ -1217,6 +1226,61 @@ const StudentELearning = () => {
           onClose={() => setQuizResult(null)}
         />
       )}
+
+      {/* View Submission Modal */}
+      <AnimatePresence>
+        {showViewSubmissionModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white dark:bg-dark-300 rounded-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="p-5 border-b border-gray-200 dark:border-dark-100 flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{showViewSubmissionModal.assignment.title}</h2>
+                  <p className="text-sm text-gray-500">{showViewSubmissionModal.assignment.total_points} pts</p>
+                </div>
+                <button onClick={() => setShowViewSubmissionModal(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-lg">
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Assignment description */}
+                <div className="p-4 bg-gray-50 dark:bg-dark-200 rounded-xl">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t("elearning_instructions")}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{showViewSubmissionModal.assignment.description}</p>
+                </div>
+                {/* Submission content */}
+                {showViewSubmissionModal.submission?.content && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t("elearning_my_answer")}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">{showViewSubmissionModal.submission.content}</p>
+                  </div>
+                )}
+                {/* File */}
+                {showViewSubmissionModal.submission?.file_name && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-200 rounded-xl">
+                    <DocumentTextIcon className="w-6 h-6 text-primary-500 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{showViewSubmissionModal.submission.file_name}</span>
+                  </div>
+                )}
+                {/* Grade & feedback */}
+                {showViewSubmissionModal.submission?.grade !== null && showViewSubmissionModal.submission?.grade !== undefined && (
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider mb-1">{t("elearning_grade")}</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-400">{showViewSubmissionModal.submission.grade} / {showViewSubmissionModal.assignment.total_points}</p>
+                    {showViewSubmissionModal.submission?.feedback && (
+                      <p className="text-sm text-green-700 dark:text-green-300 mt-2">{showViewSubmissionModal.submission.feedback}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Submission Modal */}
       <AnimatePresence>

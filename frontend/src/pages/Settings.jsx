@@ -8,7 +8,6 @@ import {
   LanguageIcon,
   BellIcon,
   EnvelopeIcon,
-  DevicePhoneMobileIcon,
   Squares2X2Icon,
   ArrowPathIcon,
   CheckIcon,
@@ -25,8 +24,7 @@ const defaultSettings = {
   language: "fr",
   email_notifications: true,
   push_notifications: true,
-  sms_notifications: false,
-  dashboard_widgets: ["stats", "calendar", "notifications", "quick_actions"],
+  dashboard_widgets: [],
 };
 
 const Settings = () => {
@@ -100,11 +98,21 @@ const Settings = () => {
         const parsed = JSON.parse(storedSettings);
         setSettings({ ...defaultSettings, ...parsed });
         applySettings(parsed);
-      } catch (e) {
-        console.error("Error loading settings:", e);
+      } catch (_) {
       }
     }
   }, []);
+
+  // Initialize dashboard_widgets to all role widgets if never configured
+  useEffect(() => {
+    if (!user?.role) return;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const hasSavedWidgets = stored && JSON.parse(stored)?.dashboard_widgets?.length > 0;
+    if (!hasSavedWidgets) {
+      const roleWidgets = (widgetsByRole[user.role] || []).map((w) => w.id);
+      setSettings((prev) => ({ ...prev, dashboard_widgets: roleWidgets }));
+    }
+  }, [user?.role]);
 
   // Apply non-theme settings immediately
   const applySettings = (newSettings) => {
@@ -115,14 +123,18 @@ const Settings = () => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
 
-    // Apply immediately for visual settings
     if (key === "font_size") {
       applySettings(newSettings);
     }
-
-    // Apply language immediately via I18n context
     if (key === "language") {
       setLanguage(value);
+    }
+    // Auto-save notification preferences immediately
+    if (key === "email_notifications" || key === "push_notifications") {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+      } catch (_) {}
+      settingsApi.update({ [key]: value }).catch(() => {});
     }
   };
 
@@ -135,7 +147,11 @@ const Settings = () => {
     const newWidgets = current.includes(widgetId)
       ? current.filter((w) => w !== widgetId)
       : [...current, widgetId];
-    handleSettingChange("dashboard_widgets", newWidgets);
+    const newSettings = { ...settings, dashboard_widgets: newWidgets };
+    setSettings(newSettings);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+    } catch (_) {}
   };
 
   const saveSettings = () => {
@@ -385,27 +401,6 @@ const Settings = () => {
             />
           </label>
 
-          <label className="flex items-center justify-between p-4 bg-gray-50 dark:bg-dark-300 rounded-lg cursor-pointer">
-            <div className="flex items-center gap-3">
-              <DevicePhoneMobileIcon className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white text-sm">
-                  {t("notifications_sms")}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {t("notifications_sms_desc")}
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.sms_notifications}
-              onChange={(e) =>
-                handleSettingChange("sms_notifications", e.target.checked)
-              }
-              className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
-            />
-          </label>
         </div>
       </motion.div>
 

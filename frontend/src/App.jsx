@@ -7,6 +7,7 @@ import DashboardLayout from './layouts/DashboardLayout'
 
 // Pages
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminFaculties from './pages/admin/Faculties'
 import AdminDepartments from './pages/admin/Departments'
@@ -47,7 +48,6 @@ import StudentAttendance from './pages/student/Attendance'
 import StudentSchedule from './pages/student/Schedule'
 import StudentFees from './pages/student/Fees'
 import StudentELearning from './pages/student/ELearning'
-import StudentPayment from './pages/student/Payment'
 
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
@@ -111,6 +111,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={user ? <Navigate to={`/${user.role}`} replace /> : <Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Admin Routes */}
         <Route
@@ -208,7 +209,6 @@ function App() {
           <Route path="schedule" element={<StudentSchedule />} />
           <Route path="fees" element={<StudentFees />} />
           <Route path="elearning" element={<StudentELearning />} />
-          <Route path="payment" element={<StudentPayment />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
         </Route>

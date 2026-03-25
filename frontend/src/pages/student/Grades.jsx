@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n/index.jsx'
 import { studentApi } from '../../services/api'
-import { ChartBarIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { PrinterIcon } from '@heroicons/react/24/outline'
 
 function fmtScore(val) {
   if (val === null || val === undefined || val === '') return '—'
@@ -150,8 +150,11 @@ export default function StudentGrades() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
-  const totalCredits = enrollments.reduce((sum, e) => sum + (e.class?.course?.credits || 0), 0)
-  const graded = enrollments.filter(e => e.grades?.length > 0 && e.grades[0]?.final_grade != null)
+  // Screen (mark sheet) = current year only; print (transcript) = all years
+  const currentEnrollments = enrollments.filter(e => e.status === 'enrolled')
+
+  const totalCredits = currentEnrollments.reduce((sum, e) => sum + (e.class?.course?.credits || 0), 0)
+  const graded = currentEnrollments.filter(e => e.grades?.length > 0 && e.grades[0]?.final_grade != null)
   const avgGrade = graded.length > 0 ? graded.reduce((s, e) => s + parseFloat(e.grades[0].final_grade), 0) / graded.length : 0
 
   return (
@@ -205,7 +208,13 @@ export default function StudentGrades() {
               </tr>
             </thead>
             <tbody>
-              {enrollments.map(enrollment => {
+              {currentEnrollments.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-8 text-gray-400 text-sm">
+                    Aucun cours actif pour cette année académique
+                  </td>
+                </tr>
+              ) : currentEnrollments.map(enrollment => {
                 const g = enrollment.grades?.[0]
                 const final = g?.final_grade != null ? parseFloat(g.final_grade) : null
                 return (

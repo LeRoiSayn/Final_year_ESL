@@ -40,8 +40,7 @@ const StudentManagement = () => {
     try {
       const response = await api.get('/departments')
       setDepartments(response.data.data || [])
-    } catch (error) {
-      console.error('Error fetching departments:', error)
+    } catch (_) {
     }
   }
 
@@ -57,8 +56,7 @@ const StudentManagement = () => {
         },
       })
       setStudents(response.data.data || [])
-    } catch (error) {
-      console.error('Error searching students:', error)
+    } catch (_) {
     } finally {
       setIsLoading(false)
     }
@@ -68,8 +66,7 @@ const StudentManagement = () => {
     try {
       const response = await api.get(`/admin/students/${studentId}/details`)
       setSelectedStudent(response.data)
-    } catch (error) {
-      console.error('Error fetching student details:', error)
+    } catch (_) {
     }
   }
 
@@ -81,8 +78,7 @@ const StudentManagement = () => {
       })
       fetchStudentDetails(selectedStudent.student.id)
       setShowGradeModal(null)
-    } catch (error) {
-      console.error('Error updating grade:', error)
+    } catch (_) {
     }
   }
 
@@ -94,7 +90,6 @@ const StudentManagement = () => {
       fetchStudentDetails(selectedStudent.student.id)
       setShowCourseModal(false)
     } catch (error) {
-      console.error('Error adding course:', error)
       alert(error.response?.data?.error || 'Erreur lors de l\'ajout du cours')
     }
   }
@@ -105,8 +100,7 @@ const StudentManagement = () => {
     try {
       await api.delete(`/admin/students/${selectedStudent.student.id}/courses/${courseId}`)
       fetchStudentDetails(selectedStudent.student.id)
-    } catch (error) {
-      console.error('Error removing course:', error)
+    } catch (_) {
     }
   }
 

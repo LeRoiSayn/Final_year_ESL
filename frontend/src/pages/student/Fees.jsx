@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
@@ -12,7 +12,6 @@ import {
   ExclamationTriangleIcon,
   CalendarIcon,
 } from '@heroicons/react/24/outline'
-import { Link } from 'react-router-dom'
 
 export default function StudentFees() {
   const { user } = useAuth()
@@ -154,13 +153,20 @@ export default function StudentFees() {
         ? `Prochaine tranche : ${formatCurrency(nextDueBalance)} — Échéance : ${nextDueDateFmt}`
     : `Solde restant total : ${formatCurrency(balance)}`
 
+  // Payment history: prefer all_payments (all years) from backend, fallback to current fees
+  const allPaymentsHistory = data.all_payments?.length > 0
+    ? data.all_payments
+    : [...(data.fees?.flatMap(f => f.payments || []) || [])].sort(
+        (a, b) => new Date(b.payment_date) - new Date(a.payment_date)
+      )
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('school_fees')}</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Année académique {new Date().getFullYear()} - {new Date().getFullYear() + 1}
+          Année académique {data.academic_year || `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`}
         </p>
       </motion.div>
 
@@ -186,16 +192,6 @@ export default function StudentFees() {
             </div>
           )}
         </div>
-        {!isPaid && (alertLevel === 'overdue' || alertLevel === 'urgent' || alertLevel === 'warning') && (
-          <Link
-            to="/student/payment"
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-white ${
-              alertLevel === 'warning' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-red-500 hover:bg-red-600'
-            }`}
-          >
-            {t('pay_now')}
-          </Link>
-        )}
       </motion.div>
 
       {/* Tuition Overview - Simple and Clean */}
@@ -267,9 +263,9 @@ export default function StudentFees() {
                   // Fee with installment plan → show a header row + one row per installment
                   if (instRows) {
                     return (
-                      <>
+                      <Fragment key={fee.id}>
                         {/* Plan header row */}
-                        <tr key={`fee-${fee.id}-header`} className="bg-blue-50 dark:bg-blue-900/20">
+                        <tr className="bg-blue-50 dark:bg-blue-900/20">
                           <td className="px-6 py-3" colSpan={4}>
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -327,7 +323,7 @@ export default function StudentFees() {
                             </tr>
                           )
                         })}
-                      </>
+                      </Fragment>
                     )
                   }
 
@@ -364,8 +360,8 @@ export default function StudentFees() {
         )}
       </motion.div>
 
-      {/* Payment History */}
-      {data.fees?.some(f => f.payments?.length > 0) && (
+      {/* Payment History — all years */}
+      {allPaymentsHistory.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -376,42 +372,40 @@ export default function StudentFees() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('payment_history')}</h2>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-dark-100">
-            {data.fees
-              ?.flatMap(f => f.payments || [])
-              .sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
-              .slice(0, 10)
-              .map((payment) => (
-                <div key={payment.id} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <CheckCircleIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {payment.reference_number}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(payment.payment_date).toLocaleDateString('fr-FR', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })} • {(payment.payment_method || 'espèces').replace('_', ' ')}
-                      </p>
-                    </div>
+            {allPaymentsHistory.slice(0, 20).map((payment) => (
+              <div key={payment.id} className="px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <CheckCircleIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
                   </div>
-                  <p className="font-medium text-green-600 dark:text-green-400">
-                    +{formatCurrency(payment.amount)}
-                  </p>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {payment.reference_number}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {new Date(payment.payment_date).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })} • {(payment.payment_method || 'espèces').replace('_', ' ')}
+                      {payment.student_fee?.fee_type?.name && (
+                        <span className="ml-1">• {payment.student_fee.fee_type.name}</span>
+                      )}
+                      {payment.student_fee?.academic_year && (
+                        <span className="ml-1 text-gray-400">({payment.student_fee.academic_year})</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
-              ))}
+                <p className="font-medium text-green-600 dark:text-green-400">
+                  +{formatCurrency(payment.amount)}
+                </p>
+              </div>
+            ))}
           </div>
         </motion.div>
       )}
 
-      {/* Note */}
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-        Pour effectuer un paiement, veuillez accéder à la page <strong>Paiement</strong> dans le menu.
-      </p>
     </div>
   )
 }

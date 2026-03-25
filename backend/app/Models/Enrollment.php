@@ -44,4 +44,16 @@ class Enrollment extends Model
     {
         return $this->hasOne(Grade::class)->latest();
     }
+
+    public function course()
+    {
+        return $this->hasOneThrough(
+            \App\Models\Course::class,
+            ClassModel::class,
+            'id',         // foreign key on class_models matching enrollments.class_id
+            'id',         // foreign key on courses matching class_models.course_id
+            'class_id',   // local key on enrollments
+            'course_id'   // local key on class_models
+        );
+    }
 }

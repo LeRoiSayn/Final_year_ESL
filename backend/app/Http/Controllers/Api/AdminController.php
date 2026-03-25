@@ -13,7 +13,9 @@ use App\Models\User;
 use App\Models\Payment;
 use App\Models\Teacher;
 use App\Models\Department;
+use App\Models\ClassModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -267,8 +269,15 @@ class AdminController extends Controller
         $gradedGrades  = $allGrades->filter(fn($g) => $g->final_grade !== null);
         $overallAverage = $gradedGrades->count() > 0 ? round($gradedGrades->avg('final_grade'), 2) : null;
 
+        // Resolve retake course IDs → actual course names for the UI
+        $retakeCourseIds     = $student->retake_courses ?? [];
+        $retakeCourseDetails = Course::whereIn('id', $retakeCourseIds)
+            ->get(['id', 'name', 'code', 'level'])
+            ->toArray();
+
         return response()->json([
             'student' => $student,
+            'retake_course_details' => $retakeCourseDetails,
             'academic_progress' => [
                 'current_level'     => $student->level,
                 'current_semester'  => $currentCalendarSemester,
@@ -523,6 +532,66 @@ class AdminController extends Controller
             'message' => 'Équivalence ' . ($request->status === 'approved' ? 'approuvée' : 'rejetée'),
             'equivalence' => $equivalence->load('equivalentCourse'),
         ]);
+    }
+
+    /**
+     * Add historical (transfer) grade for a transferred student
+     */
+    public function addTransferGrade(Request $request, $studentId)
+    {
+        $request->validate([
+            'course_id'     => 'required|exists:courses,id',
+            'final_grade'   => 'required|numeric|min:0|max:100',
+            'source_school' => 'nullable|string|max:255',
+        ]);
+
+        $student = Student::findOrFail($studentId);
+
+        // Check for existing non-transfer enrollment in this course
+        $existing = Enrollment::where('student_id', $studentId)
+            ->where('status', '!=', 'transfer')
+            ->whereHas('class', fn($q) => $q->where('course_id', $request->course_id))
+            ->first();
+
+        if ($existing) {
+            return response()->json(['message' => 'L\'étudiant est déjà inscrit dans ce cours.'], 422);
+        }
+
+        // Find any class for this course, or use first available
+        $class = ClassModel::where('course_id', $request->course_id)->first();
+
+        if (!$class) {
+            return response()->json(['message' => 'Aucune classe trouvée pour ce cours.'], 422);
+        }
+
+        // Create transfer enrollment
+        $enrollment = Enrollment::create([
+            'student_id'      => $studentId,
+            'class_id'        => $class->id,
+            'enrollment_date' => now(),
+            'status'          => 'transfer',
+        ]);
+
+        // Create grade record
+        $letterGrade = Grade::calculateLetterGrade((float) $request->final_grade);
+        $remarks = $request->source_school
+            ? 'Transféré de: ' . $request->source_school
+            : 'Cours transféré';
+
+        Grade::create([
+            'enrollment_id' => $enrollment->id,
+            'final_grade'   => $request->final_grade,
+            'letter_grade'  => $letterGrade,
+            'remarks'       => $remarks,
+            'graded_by'     => $request->user()->id,
+            'graded_at'     => now(),
+            'validated_at'  => now(),
+            'validated_by'  => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Note de transfert ajoutée avec succès',
+        ], 201);
     }
 
     // ==================== ANALYTICS ====================
