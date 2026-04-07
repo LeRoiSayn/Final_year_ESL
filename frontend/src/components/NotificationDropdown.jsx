@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useI18n } from '../i18n/index.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BellIcon,
@@ -39,7 +40,9 @@ const priorityIconColors = {
   low: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30',
 }
 
-export default function NotificationDropdown({ t }) {
+export default function NotificationDropdown({ t: tProp }) {
+  const { t: tI18n } = useI18n()
+  const t = tProp || tI18n
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -89,10 +92,10 @@ export default function NotificationDropdown({ t }) {
     const now = new Date()
     const diff = Math.floor((now - date) / 1000)
 
-    if (diff < 60) return "À l'instant"
-    if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`
-    if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)}h`
-    if (diff < 604800) return `Il y a ${Math.floor(diff / 86400)}j`
+    if (diff < 60) return t('just_now')
+    if (diff < 3600) return `${Math.floor(diff / 60)} ${t('minutes_ago')}`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} ${t('hours_ago')}`
+    if (diff < 604800) return `${Math.floor(diff / 86400)} ${t('days_ago')}`
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   }
 

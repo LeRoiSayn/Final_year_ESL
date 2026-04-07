@@ -67,7 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/teacher', [DashboardController::class, 'teacherStats'])
             ->middleware('role:teacher');
         Route::get('/finance', [DashboardController::class, 'financeStats'])
-            ->middleware('role:finance');
+            ->middleware('role:admin|finance');
         Route::get('/registrar', [DashboardController::class, 'registrarStats'])
             ->middleware('role:registrar');
     });
@@ -157,6 +157,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('admin')->group(function () {
             Route::get('/students/search', [AdminController::class, 'searchStudents']);
             Route::get('/students/{id}/details', [AdminController::class, 'getStudentDetails']);
+            Route::get('/students/{id}/report', [AdminController::class, 'getStudentReport']);
+            // Two separate external sheets (files)
+            Route::get('/students/{id}/report/sheet/academic', [AdminController::class, 'viewStudentAcademicSheet']);
+            Route::get('/students/{id}/report/download/academic', [AdminController::class, 'downloadStudentAcademicSheet']);
+            Route::get('/students/{id}/report/sheet/financial', [AdminController::class, 'viewStudentFinancialSheet']);
+            Route::get('/students/{id}/report/download/financial', [AdminController::class, 'downloadStudentFinancialSheet']);
             Route::get('/grades/overview', [GradeController::class, 'adminOverview']);
             Route::post('/grades/validate-class/{classId}', [GradeController::class, 'validateClass']);
             Route::post('/grades/reject-class/{classId}', [GradeController::class, 'rejectClass']);

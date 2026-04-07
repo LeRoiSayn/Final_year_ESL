@@ -46,7 +46,7 @@ export default function AdminActivityLog() {
 
   const columns = [
     {
-      header: 'Time',
+      header: t('time'),
       cell: (row) => (
         <div className="flex items-center gap-2">
           <ClockIcon className="w-4 h-4 text-gray-400" />
@@ -57,7 +57,7 @@ export default function AdminActivityLog() {
       ),
     },
     {
-      header: 'User',
+      header: t('user'),
       cell: (row) => row.user ? (
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-xs font-medium">
@@ -70,7 +70,7 @@ export default function AdminActivityLog() {
       ),
     },
     {
-      header: 'Action',
+      header: t('action'),
       cell: (row) => (
         <span className={`badge ${getActionColor(row.action)}`}>
           {row.action}
@@ -78,7 +78,7 @@ export default function AdminActivityLog() {
       ),
     },
     {
-      header: 'Description',
+      header: t('description'),
       accessor: 'description',
       cell: (row) => (
         <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -87,7 +87,7 @@ export default function AdminActivityLog() {
       ),
     },
     {
-      header: 'IP Address',
+      header: t('ip_address'),
       accessor: 'ip_address',
       cell: (row) => (
         <span className="text-sm font-mono text-gray-500">
@@ -104,10 +104,10 @@ export default function AdminActivityLog() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-          Activity Log
+          {t('activity_log')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Track all system activities
+          {t('activity_log_subtitle')}
         </p>
       </motion.div>
 
@@ -120,7 +120,7 @@ export default function AdminActivityLog() {
           columns={columns}
           data={logs}
           loading={loading}
-          searchPlaceholder="Search logs..."
+          searchPlaceholder={t('search_logs')}
           pageSize={20}
         />
       </motion.div>

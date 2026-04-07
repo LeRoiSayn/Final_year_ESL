@@ -1,0 +1,12 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Connect the repo, apply this blueprint, then set secrets in the dashboard:
+# APP_KEY, DB_*, SANCTUM / mail / payment keys as needed.
+
+services:
+  - type: web
+    name: esl-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /api/settings/public

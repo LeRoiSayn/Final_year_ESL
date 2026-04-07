@@ -183,7 +183,7 @@ export default function AdminDashboard() {
             <div className="h-64"><Bar data={levelChartData} options={chartOptions} /></div>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Students</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('recent_students')}</h3>
             <div className="space-y-4">
               {stats?.recent_students?.map((student) => (
                 <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-dark-300">

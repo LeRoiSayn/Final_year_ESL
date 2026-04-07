@@ -20,18 +20,36 @@ class DashboardController extends Controller
 {
     public function adminStats()
     {
+        // 7 COUNTs → 2 queries using conditional aggregation (PostgreSQL FILTER syntax)
+        $studentRow = DB::selectOne("
+            SELECT COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE status = 'active') AS active
+            FROM students
+        ");
+        $teacherRow = DB::selectOne("
+            SELECT COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE status = 'active') AS active
+            FROM teachers
+        ");
+        $miscRow = DB::selectOne("
+            SELECT
+                (SELECT COUNT(*) FROM courses)     AS total_courses,
+                (SELECT COUNT(*) FROM departments) AS total_departments,
+                (SELECT COUNT(*) FROM faculties)   AS total_faculties
+        ");
+
         $stats = [
-            'total_students' => Student::count(),
-            'total_teachers' => Teacher::count(),
-            'total_courses' => Course::count(),
-            'total_departments' => Department::count(),
-            'total_faculties' => Faculty::count(),
-            'active_students' => Student::where('status', 'active')->count(),
-            'active_teachers' => Teacher::where('status', 'active')->count(),
+            'total_students'    => (int) ($studentRow->total    ?? 0),
+            'active_students'   => (int) ($studentRow->active   ?? 0),
+            'total_teachers'    => (int) ($teacherRow->total    ?? 0),
+            'active_teachers'   => (int) ($teacherRow->active   ?? 0),
+            'total_courses'     => (int) ($miscRow->total_courses     ?? 0),
+            'total_departments' => (int) ($miscRow->total_departments ?? 0),
+            'total_faculties'   => (int) ($miscRow->total_faculties   ?? 0),
         ];
 
         // Enrollment trends (last 6 months)
-        $enrollmentTrends = Student::selectRaw('DATE_FORMAT(enrollment_date, "%Y-%m") as month, COUNT(*) as count')
+        $enrollmentTrends = Student::selectRaw("TO_CHAR(enrollment_date, 'YYYY-MM') as month, COUNT(*) as count")
             ->where('enrollment_date', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month')
@@ -132,12 +150,19 @@ class DashboardController extends Controller
 
     public function financeStats()
     {
-        $totalRevenue = Payment::sum('amount');
-        $pendingFees = StudentFee::where('status', '!=', 'paid')->sum(DB::raw('amount - paid_amount'));
-        $todayPayments = Payment::whereDate('payment_date', today())->sum('amount');
-        $monthlyRevenue = Payment::whereMonth('payment_date', now()->month)
-            ->whereYear('payment_date', now()->year)
-            ->sum('amount');
+        // 4 separate SUM queries → 1 query with conditional aggregation
+        $payRow = DB::selectOne("
+            SELECT
+                COALESCE(SUM(amount), 0)                                                              AS total_revenue,
+                COALESCE(SUM(amount) FILTER (WHERE payment_date::date = CURRENT_DATE), 0)             AS today_collection,
+                COALESCE(SUM(amount) FILTER (
+                    WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', NOW())
+                ), 0)                                                                                  AS monthly_revenue
+            FROM payments
+        ");
+
+        $pendingFees = StudentFee::where('status', '!=', 'paid')
+            ->sum(DB::raw('amount - paid_amount'));
 
         // Revenue by fee type
         $revenueByType = DB::table('payments')
@@ -148,7 +173,7 @@ class DashboardController extends Controller
             ->get();
 
         // Monthly trends
-        $monthlyTrends = Payment::selectRaw('DATE_FORMAT(payment_date, "%Y-%m") as month, SUM(amount) as total')
+        $monthlyTrends = Payment::selectRaw("TO_CHAR(payment_date, 'YYYY-MM') as month, SUM(amount) as total")
             ->where('payment_date', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month')
@@ -161,25 +186,37 @@ class DashboardController extends Controller
             ->get();
 
         return $this->success([
-            'total_revenue' => $totalRevenue,
-            'pending_fees' => $pendingFees,
-            'today_payments' => $todayPayments,
-            'monthly_revenue' => $monthlyRevenue,
+            'total_revenue'   => (float) ($payRow->total_revenue   ?? 0),
+            'pending_fees'    => (float) $pendingFees,
+            'today_collection'=> (float) ($payRow->today_collection ?? 0),
+            'monthly_revenue' => (float) ($payRow->monthly_revenue  ?? 0),
+            // legacy aliases kept for frontend compatibility
+            'today_payments'  => (float) ($payRow->today_collection ?? 0),
             'revenue_by_type' => $revenueByType,
-            'monthly_trends' => $monthlyTrends,
+            'monthly_trends'  => $monthlyTrends,
             'recent_payments' => $recentPayments,
         ]);
     }
 
     public function registrarStats()
     {
+        // 4 separate COUNTs → 1 query
+        $row = DB::selectOne("
+            SELECT
+                COUNT(*)                                                              AS total_students,
+                COUNT(*) FILTER (WHERE status = 'active')                            AS active_students,
+                COUNT(*) FILTER (
+                    WHERE DATE_TRUNC('month', enrollment_date) = DATE_TRUNC('month', NOW())
+                )                                                                     AS new_this_month
+            FROM students
+        ");
+        $totalTeachers = Teacher::count();
+
         $stats = [
-            'total_students' => Student::count(),
-            'total_teachers' => Teacher::count(),
-            'active_students' => Student::where('status', 'active')->count(),
-            'new_this_month' => Student::whereMonth('enrollment_date', now()->month)
-                ->whereYear('enrollment_date', now()->year)
-                ->count(),
+            'total_students'  => (int) ($row->total_students  ?? 0),
+            'active_students' => (int) ($row->active_students ?? 0),
+            'new_this_month'  => (int) ($row->new_this_month  ?? 0),
+            'total_teachers'  => (int) $totalTeachers,
         ];
 
         // Students by level

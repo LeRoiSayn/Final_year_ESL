@@ -1,7 +1,10 @@
 import axios from "axios";
 
+// Dev: Vite proxy handles /api → backend (no VITE_API_URL needed).
+// Prod: set VITE_API_URL=https://your-backend.com  (no trailing slash, no /api suffix).
+const apiRoot = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: apiRoot ? `${apiRoot}/api` : "/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -42,13 +45,33 @@ export const authApi = {
   resetPassword: (data) => api.post('/reset-password', data),
 }
 
+// ── Simple in-memory cache for dashboard stats ─────────────────────────────
+// Avoids re-fetching on every page navigation. TTL = 2 minutes.
+const _cache = {};
+const CACHE_TTL = 2 * 60 * 1000;
+
+function withCache(key, fetcher) {
+  const now = Date.now();
+  const hit = _cache[key];
+  if (hit && now - hit.ts < CACHE_TTL) return Promise.resolve(hit.res);
+  return fetcher().then((res) => {
+    _cache[key] = { res, ts: now };
+    return res;
+  });
+}
+
+// Call this after a mutation that changes dashboard figures (e.g. new payment)
+export function invalidateDashboardCache() {
+  Object.keys(_cache).forEach((k) => delete _cache[k]);
+}
+
 // Dashboard APIs
 export const dashboardApi = {
-  getAdminStats: () => api.get("/dashboard/admin"),
-  getStudentStats: () => api.get("/dashboard/student"),
-  getTeacherStats: () => api.get("/dashboard/teacher"),
-  getFinanceStats: () => api.get("/dashboard/finance"),
-  getRegistrarStats: () => api.get("/dashboard/registrar"),
+  getAdminStats:     () => withCache("admin",     () => api.get("/dashboard/admin")),
+  getStudentStats:   () => withCache("student",   () => api.get("/dashboard/student")),
+  getTeacherStats:   () => withCache("teacher",   () => api.get("/dashboard/teacher")),
+  getFinanceStats:   () => withCache("finance",   () => api.get("/dashboard/finance")),
+  getRegistrarStats: () => withCache("registrar", () => api.get("/dashboard/registrar")),
 };
 
 // Faculty APIs
@@ -233,6 +256,15 @@ export const chatbotApi = {
 export const adminApi = {
   searchStudents: (params) => api.get("/admin/students/search", { params }),
   getStudentDetails: (id) => api.get(`/admin/students/${id}/details`),
+  getStudentReport: (id) => api.get(`/admin/students/${id}/report`),
+  getStudentAcademicSheet: (id) =>
+    api.get(`/admin/students/${id}/report/sheet/academic`, { responseType: "blob" }),
+  downloadStudentAcademicSheet: (id) =>
+    api.get(`/admin/students/${id}/report/download/academic`, { responseType: "blob" }),
+  getStudentFinancialSheet: (id) =>
+    api.get(`/admin/students/${id}/report/sheet/financial`, { responseType: "blob" }),
+  downloadStudentFinancialSheet: (id) =>
+    api.get(`/admin/students/${id}/report/download/financial`, { responseType: "blob" }),
   updateGrade: (gradeId, data) => api.put(`/admin/grades/${gradeId}`, data),
   getGradeHistory: (gradeId) => api.get(`/admin/grades/${gradeId}/history`),
   validateClassGrades: (classId) => api.post(`/admin/grades/validate-class/${classId}`),

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useI18n } from '../i18n/index.jsx'
 import { motion } from 'framer-motion'
 import {
   MagnifyingGlassIcon,
@@ -20,6 +21,7 @@ export default function DataTable({
   onRowClick,
   rowClassName,
 }) {
+  const { t } = useI18n()
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -97,7 +99,7 @@ export default function DataTable({
             className="btn-secondary flex items-center gap-2"
           >
             <ArrowDownTrayIcon className="w-4 h-4" />
-            Export
+            {t('export')}
           </button>
           {actions}
         </div>
