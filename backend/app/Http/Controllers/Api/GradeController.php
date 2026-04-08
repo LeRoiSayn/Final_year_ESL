@@ -9,6 +9,7 @@ use App\Models\ActivityLog;
 use App\Models\ClassModel;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 
 class GradeController extends Controller
@@ -32,14 +33,25 @@ class GradeController extends Controller
         return $this->success($grades);
     }
 
+    private function gradeMaxPoints(): array
+    {
+        return [
+            'attendance' => SystemSetting::get('grade_weight_attendance', 10),
+            'quiz'       => SystemSetting::get('grade_weight_quiz', 20),
+            'ca'         => SystemSetting::get('grade_weight_ca', 30),
+            'exam'       => SystemSetting::get('grade_weight_exam', 40),
+        ];
+    }
+
     public function store(Request $request)
     {
+        $max = $this->gradeMaxPoints();
         $request->validate([
             'enrollment_id'         => 'required|exists:enrollments,id',
-            'attendance_score'      => 'nullable|numeric|min:0|max:10',
-            'quiz_score'            => 'nullable|numeric|min:0|max:20',
-            'continuous_assessment' => 'nullable|numeric|min:0|max:30',
-            'exam_score'            => 'nullable|numeric|min:0|max:40',
+            'attendance_score'      => "nullable|numeric|min:0|max:{$max['attendance']}",
+            'quiz_score'            => "nullable|numeric|min:0|max:{$max['quiz']}",
+            'continuous_assessment' => "nullable|numeric|min:0|max:{$max['ca']}",
+            'exam_score'            => "nullable|numeric|min:0|max:{$max['exam']}",
             'remarks'               => 'nullable|string',
         ]);
 
@@ -81,11 +93,16 @@ class GradeController extends Controller
 
     public function update(Request $request, Grade $grade)
     {
+        if ($grade->validated_at !== null) {
+            return $this->error('Cette note est validée et ne peut plus être modifiée.', 422);
+        }
+
+        $max = $this->gradeMaxPoints();
         $request->validate([
-            'attendance_score'      => 'nullable|numeric|min:0|max:10',
-            'quiz_score'            => 'nullable|numeric|min:0|max:20',
-            'continuous_assessment' => 'nullable|numeric|min:0|max:30',
-            'exam_score'            => 'nullable|numeric|min:0|max:40',
+            'attendance_score'      => "nullable|numeric|min:0|max:{$max['attendance']}",
+            'quiz_score'            => "nullable|numeric|min:0|max:{$max['quiz']}",
+            'continuous_assessment' => "nullable|numeric|min:0|max:{$max['ca']}",
+            'exam_score'            => "nullable|numeric|min:0|max:{$max['exam']}",
             'remarks'               => 'nullable|string',
         ]);
 
@@ -124,7 +141,10 @@ class GradeController extends Controller
 
     public function byClass(int $classId)
     {
-        $enrollments = Enrollment::with(['student.user', 'grades'])
+        $enrollments = Enrollment::with([
+            'student.user',
+            'grades' => fn ($q) => $q->orderByDesc('id'),
+        ])
             ->where('class_id', $classId)
             ->where('status', 'enrolled')
             ->get();
@@ -134,17 +154,25 @@ class GradeController extends Controller
 
     public function bulkUpdate(Request $request)
     {
+        $max = $this->gradeMaxPoints();
         $request->validate([
             'grades'                        => 'required|array',
             'grades.*.enrollment_id'        => 'required|exists:enrollments,id',
-            'grades.*.attendance_score'     => 'nullable|numeric|min:0|max:10',
-            'grades.*.quiz_score'           => 'nullable|numeric|min:0|max:20',
-            'grades.*.continuous_assessment'=> 'nullable|numeric|min:0|max:30',
-            'grades.*.exam_score'           => 'nullable|numeric|min:0|max:40',
+            'grades.*.attendance_score'     => "nullable|numeric|min:0|max:{$max['attendance']}",
+            'grades.*.quiz_score'           => "nullable|numeric|min:0|max:{$max['quiz']}",
+            'grades.*.continuous_assessment'=> "nullable|numeric|min:0|max:{$max['ca']}",
+            'grades.*.exam_score'           => "nullable|numeric|min:0|max:{$max['exam']}",
         ]);
 
         $updated = 0;
+        $skippedValidated = 0;
         foreach ($request->grades as $gradeData) {
+            $existing = Grade::where('enrollment_id', $gradeData['enrollment_id'])->first();
+            if ($existing && $existing->validated_at !== null) {
+                $skippedValidated++;
+                continue;
+            }
+
             $attendance = (float)($gradeData['attendance_score']  ?? 0);
             $quiz       = (float)($gradeData['quiz_score']        ?? 0);
             $ca         = (float)($gradeData['continuous_assessment'] ?? 0);
@@ -168,9 +196,12 @@ class GradeController extends Controller
             $updated++;
         }
 
-        ActivityLog::log('bulk_update', "Bulk updated {$updated} grades");
+        ActivityLog::log('bulk_update', "Bulk updated {$updated} grades (skipped {$skippedValidated} validated)");
 
-        return $this->success(['updated' => $updated], "Updated {$updated} grades successfully");
+        return $this->success([
+            'updated' => $updated,
+            'skipped_validated' => $skippedValidated,
+        ], "Updated {$updated} grades successfully");
     }
 
     /**
@@ -189,6 +220,26 @@ class GradeController extends Controller
 
         $gradedCount = Grade::whereHas('enrollment', fn($q) => $q->where('class_id', $classId))->count();
         $totalCount  = \App\Models\Enrollment::where('class_id', $classId)->where('status', 'enrolled')->count();
+
+        $enrolled = Enrollment::where('class_id', $classId)->where('status', 'enrolled')->get();
+        if ($enrolled->isEmpty()) {
+            return $this->error('Aucun étudiant inscrit dans cette classe.', 422);
+        }
+
+        // Allow submit unless every enrolled student already has an admin-validated grade
+        // (covers: no grades yet, drafts only, or mix — not only "exists row with null validated_at")
+        $allValidated = $enrolled->every(function (Enrollment $e) {
+            $g = Grade::where('enrollment_id', $e->id)->orderByDesc('id')->first();
+
+            return $g && $g->validated_at !== null;
+        });
+
+        if ($allValidated) {
+            return $this->error(
+                'Toutes les notes de cette classe sont déjà validées par l\'administration. Aucune soumission n\'est nécessaire.',
+                422
+            );
+        }
 
         $teacherName = trim(($teacher->user->first_name ?? '') . ' ' . ($teacher->user->last_name ?? ''));
         $courseName  = $class->course->name ?? 'Cours ' . $classId;
@@ -249,9 +300,14 @@ class GradeController extends Controller
                     ->first();
 
                 $submitted = $latestSubmission !== null;
+
+                // Determine status, with fallback: if ALL enrolled students are graded
+                // but no submission notification exists (e.g. seeded data), treat as submitted.
+                $allGraded = $totalEnrolled > 0 && $graded >= $totalEnrolled;
+
                 $status = 'pending'; // not yet submitted
-                if ($submitted) {
-                    $status = 'submitted'; // submitted, awaiting review
+                if ($submitted || $allGraded) {
+                    $status = 'submitted'; // submitted (explicit or implicit), awaiting review
                 }
                 if ($latestValidation) {
                     if (!$latestSubmission || $latestValidation->created_at->gte($latestSubmission->created_at)) {
@@ -271,7 +327,7 @@ class GradeController extends Controller
                     'teacher_id'    => $class->teacher_id,
                     'total_enrolled'=> $totalEnrolled,
                     'graded'        => $graded,
-                    'submitted'     => $submitted,
+                    'submitted'     => $submitted || $allGraded,
                     'status'        => $status,
                     'rejection_reason' => ($status === 'rejected' && $latestValidation)
                         ? ($latestValidation->data['reason'] ?? null)

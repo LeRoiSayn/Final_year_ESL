@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
@@ -20,6 +20,13 @@ import {
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useI18n } from "../../i18n/index.jsx";
+import { openExternalUrl, saveOrOpenBlob } from "../../utils/mobileWeb";
+
+function getEnrollmentCourseId(enrollment) {
+  if (!enrollment) return null;
+  const id = enrollment.class?.course_id ?? enrollment.course_id;
+  return id != null ? Number(id) : null;
+}
 
 // ─── QuizResultModal ─────────────────────────────────────────────────────────
 // Standalone component (outside StudentELearning) so it never unmounts unexpectedly
@@ -33,17 +40,20 @@ const QuizResultModal = ({ result, quiz, onClose }) => {
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white dark:bg-dark-300 rounded-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
       >
-        {/* Score Banner */}
-        <div className={`p-6 text-center ${passed ? "bg-green-500" : "bg-red-500"}`}>
-          <h2 className="text-2xl font-bold text-white">
+        {/* Score summary — neutre, lisible */}
+        <div className="p-6 text-center border-b border-gray-200 dark:border-dark-100 bg-gray-50 dark:bg-dark-200/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {passed ? t("elearning_quiz_passed") : t("elearning_quiz_failed")}
-          </h2>
-          <p className="text-5xl font-bold text-white mt-2">
-            {result.score?.toFixed(1)}
-            <span className="text-2xl opacity-70">/{quiz.total_points}</span>
           </p>
-          <p className="text-white/80 mt-1 text-sm">
-            {result.correct_count}/{result.total_questions} {t("elearning_correct_answers")}
+          <p className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mt-2 tabular-nums">
+            {result.score?.toFixed(1)}
+            <span className="text-xl sm:text-2xl font-semibold text-gray-500 dark:text-gray-400">
+              /{quiz.total_points}
+            </span>
+          </p>
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm">
+            {result.correct_count}/{result.total_questions}{" "}
+            {t("elearning_correct_answers")}
           </p>
         </div>
 
@@ -56,17 +66,17 @@ const QuizResultModal = ({ result, quiz, onClose }) => {
             {result.answers.map((a, i) => (
               <div
                 key={i}
-                className={`p-3 rounded-lg border-2 ${
+                className={`p-3 rounded-xl border ${
                   a.is_correct
-                    ? "border-green-400 bg-green-50 dark:bg-green-900/20"
-                    : "border-red-400 bg-red-50 dark:bg-red-900/20"
+                    ? "border-gray-200 bg-white dark:bg-dark-200/50 dark:border-dark-100"
+                    : "border-gray-300 bg-gray-50/80 dark:bg-dark-200/70 dark:border-dark-100"
                 }`}
               >
                 <div className="flex items-start gap-2">
                   {a.is_correct ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                    <CheckCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" />
                   ) : (
-                    <XCircleIcon className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <XCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" />
                   )}
                   <div className="flex-1 text-sm">
                     <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -74,13 +84,7 @@ const QuizResultModal = ({ result, quiz, onClose }) => {
                     </p>
                     <p className="text-gray-600 dark:text-gray-400">
                       <span className="font-medium">{t("elearning_your_answer")}:</span>{" "}
-                      <span
-                        className={
-                          a.is_correct
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-red-600 dark:text-red-400"
-                        }
-                      >
+                      <span className="text-gray-900 dark:text-gray-100">
                         {a.your_answer ?? (
                           <em className="text-gray-400">{t("elearning_no_answer")}</em>
                         )}
@@ -89,7 +93,7 @@ const QuizResultModal = ({ result, quiz, onClose }) => {
                     {!a.is_correct && (
                       <p className="text-gray-600 dark:text-gray-400 mt-1">
                         <span className="font-medium">{t("elearning_correct_answer")}:</span>{" "}
-                        <span className="text-green-600 dark:text-green-400">
+                        <span className="text-gray-800 dark:text-gray-200">
                           {Array.isArray(a.correct_answer)
                             ? a.correct_answer[0]
                             : a.correct_answer}
@@ -189,7 +193,7 @@ const QuizModal = ({ activeQuiz, onFinish }) => {
         className="bg-white dark:bg-dark-300 rounded-2xl w-full max-w-3xl overflow-hidden"
       >
         {/* Quiz Header */}
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white p-4">
+        <div className="bg-gray-800 dark:bg-dark-100 text-white p-4 border-b border-gray-700/50">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="font-bold text-lg">{activeQuiz.quiz.title}</h2>
@@ -199,7 +203,7 @@ const QuizModal = ({ activeQuiz, onFinish }) => {
             </div>
             <div className="text-right">
               <div
-                className={`text-3xl font-bold font-mono ${timeLeft < 60 ? "text-red-300 animate-pulse" : ""}`}
+                className={`text-3xl font-bold font-mono ${timeLeft < 60 ? "text-amber-200/90 animate-pulse" : ""}`}
               >
                 {formatTime(timeLeft)}
               </div>
@@ -301,7 +305,7 @@ const QuizModal = ({ activeQuiz, onFinish }) => {
                   currentQuestion === i
                     ? "bg-primary-500 text-white"
                     : quizAnswers[activeQuiz.questions[i].id]
-                      ? "bg-green-500 text-white"
+                      ? "bg-gray-600 text-white dark:bg-gray-500"
                       : "bg-gray-200 dark:bg-dark-100 text-gray-600 dark:text-gray-400"
                 }`}
               >
@@ -327,7 +331,7 @@ const QuizModal = ({ activeQuiz, onFinish }) => {
             <button
               onClick={submitQuizFn}
               disabled={isSubmitting}
-              className="px-6 py-2 rounded-lg bg-green-500 text-white font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+              className="px-6 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? "..." : t("elearning_submit_quiz")}
             </button>
@@ -361,6 +365,7 @@ const StudentELearning = () => {
   const [quizzes, setQuizzes] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState("");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [activeQuiz, setActiveQuiz] = useState(null);
   // quizResult: { result, quiz } — set after quiz submission; drives QuizResultModal
@@ -370,6 +375,7 @@ const StudentELearning = () => {
   const [showSubmissionModal, setShowSubmissionModal] = useState(null);
   const [showViewSubmissionModal, setShowViewSubmissionModal] = useState(null);
   const [now, setNow] = useState(() => new Date());
+  const statusRef = useRef({});
 
   useEffect(() => {
     if (user) fetchData();
@@ -381,16 +387,54 @@ const StudentELearning = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const refreshOnlineCourses = useCallback(async () => {
+    try {
+      const onlineRes = await api.get("/elearning/courses/student");
+      setOnlineCourses(onlineRes.data.courses || []);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    if (!user?.student?.id) return;
+    const timer = setInterval(() => {
+      refreshOnlineCourses();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [user?.student?.id, refreshOnlineCourses]);
+
+  useEffect(() => {
+    const selectedCourseId = getEnrollmentCourseId(selectedCourse);
+    const prev = statusRef.current;
+    for (const c of onlineCourses) {
+      const old = prev[c.id];
+      const relevant =
+        selectedCourseId == null || Number(c.course_id) === Number(selectedCourseId);
+      if (relevant && old !== undefined && old !== c.status) {
+        if (c.status === "live") {
+          toast.success(t("elearning_live_now_toast"));
+        }
+        if (old === "live" && c.status === "ended") {
+          toast(t("elearning_session_ended_toast"));
+        }
+      }
+    }
+    const next = { ...prev };
+    for (const c of onlineCourses) {
+      next[c.id] = c.status;
+    }
+    statusRef.current = next;
+  }, [onlineCourses, selectedCourse, t]);
+
   // Reset visited tabs when selected course changes
   useEffect(() => {
     setVisitedTabs(new Set(["courses"]));
     setActiveTab("courses");
-  }, [selectedCourse?.course_id, selectedCourse?.class?.course_id]);
+  }, [selectedCourse?.id]);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [onlineRes] = await Promise.all([api.get("/elearning/courses/student")]);
+      const onlineRes = await api.get("/elearning/courses/student");
       setOnlineCourses(onlineRes.data.courses || []);
 
       if (user?.student?.id) {
@@ -448,24 +492,37 @@ const StudentELearning = () => {
     }
   };
 
-  const handleCourseChange = (courseId) => {
-    const course = enrolledCourses.find(
-      (c) => (c.course_id || c.class?.course_id) === parseInt(courseId),
+  const handleCourseChange = (enrollmentIdStr) => {
+    if (!enrollmentIdStr) {
+      setSelectedEnrollmentId("");
+      setSelectedCourse(null);
+      return;
+    }
+    const enrollment = enrolledCourses.find(
+      (e) => String(e.id) === String(enrollmentIdStr),
     );
-    setSelectedCourse(course);
-    if (courseId) {
-      fetchMaterials(courseId);
-      fetchQuizzes(courseId);
-      fetchAssignments(courseId);
+    setSelectedEnrollmentId(String(enrollmentIdStr));
+    setSelectedCourse(enrollment || null);
+    const cid = enrollment ? getEnrollmentCourseId(enrollment) : null;
+    if (cid) {
+      fetchMaterials(cid);
+      fetchQuizzes(cid);
+      fetchAssignments(cid);
     }
   };
 
   const joinCourse = async (courseId) => {
     try {
       const response = await api.post(`/elearning/courses/${courseId}/join`);
-      if (response.data.meeting_url) {
-        window.open(response.data.meeting_url, "_blank");
+      const meetingUrl = response.data?.meeting_url;
+      if (!meetingUrl) {
+        toast.error(t("elearning_no_meeting_link"));
+        return;
+      }
+      if (openExternalUrl(meetingUrl)) {
         toast.success(t("joining_live_course"));
+      } else {
+        toast.error(t("error"));
       }
     } catch (error) {
       toast.error(error.response?.data?.error || t("error"));
@@ -477,15 +534,28 @@ const StudentELearning = () => {
       const response = await api.get(`/elearning/materials/${materialId}/download`, {
         responseType: "blob",
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const mime =
+        response.headers?.["content-type"]?.split(";")[0]?.trim() ||
+        "application/octet-stream";
+      saveOrOpenBlob(response.data, fileName || "document", mime);
       toast.success(t("download_started"));
     } catch (error) {
+      toast.error(t("error"));
+    }
+  };
+
+  const downloadSubmissionFile = async (submissionId, fileName) => {
+    try {
+      const response = await api.get(
+        `/elearning/assignments/submission/${submissionId}/download`,
+        { responseType: "blob" },
+      );
+      const mime =
+        response.headers?.["content-type"]?.split(";")[0]?.trim() ||
+        "application/octet-stream";
+      saveOrOpenBlob(response.data, fileName || "remise", mime);
+      toast.success(t("download_started"));
+    } catch {
       toast.error(t("error"));
     }
   };
@@ -515,7 +585,7 @@ const StudentELearning = () => {
       }
     }
 
-    const courseId = selectedCourse?.course_id || selectedCourse?.class?.course_id;
+    const courseId = getEnrollmentCourseId(selectedCourse);
     if (courseId) fetchQuizzes(courseId);
   };
 
@@ -577,8 +647,8 @@ const StudentELearning = () => {
         });
         toast.success(t("assignment_submitted"));
         setShowSubmissionModal(null);
-        if (selectedCourse)
-          fetchAssignments(selectedCourse.course_id || selectedCourse.class?.course_id);
+        const cid = getEnrollmentCourseId(selectedCourse);
+        if (cid) fetchAssignments(cid);
       } catch (error) {
         toast.error(error.response?.data?.error || t("error"));
       } finally {
@@ -737,16 +807,13 @@ const StudentELearning = () => {
           {t("elearning_select_course_label")}
         </label>
         <select
-          value={selectedCourse?.course_id || selectedCourse?.class?.course_id || ""}
+          value={selectedEnrollmentId}
           onChange={(e) => handleCourseChange(e.target.value)}
           className="w-full p-3 rounded-xl bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
         >
           <option value="">{t("elearning_select_course_option")}</option>
           {enrolledCourses.map((enrollment) => (
-            <option
-              key={enrollment.id}
-              value={enrollment.course_id || enrollment.class?.course_id}
-            >
+            <option key={enrollment.id} value={String(enrollment.id)}>
               {enrollment.class?.course?.name || enrollment.course?.name || t("course")}
             </option>
           ))}
@@ -781,10 +848,9 @@ const StudentELearning = () => {
         {/* Online Courses */}
         {activeTab === "courses" &&
           (() => {
-            const selectedCourseId =
-              selectedCourse?.course_id || selectedCourse?.class?.course_id;
+            const selectedCourseId = getEnrollmentCourseId(selectedCourse);
             const filteredOnlineCourses = selectedCourseId
-              ? onlineCourses.filter((c) => c.course_id === parseInt(selectedCourseId))
+              ? onlineCourses.filter((c) => Number(c.course_id) === Number(selectedCourseId))
               : onlineCourses;
             return (
               <div className="space-y-4">
@@ -820,11 +886,11 @@ const StudentELearning = () => {
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div
-                            className={`p-3 rounded-xl ${course.status === "live" ? "bg-red-100 dark:bg-red-900/30 text-red-600" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600"}`}
+                            className={`p-3 rounded-xl border border-gray-200/80 dark:border-dark-100 ${course.status === "live" ? "bg-gray-100 dark:bg-dark-200 text-gray-800 dark:text-gray-200" : "bg-gray-50 dark:bg-dark-200/80 text-gray-700 dark:text-gray-300"}`}
                           >
                             {course.status === "live" ? (
                               <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                <span className="w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
                                 <VideoCameraIcon className="w-5 h-5" />
                               </div>
                             ) : (
@@ -832,12 +898,12 @@ const StudentELearning = () => {
                             )}
                           </div>
                           <span
-                            className={`text-xs font-medium px-3 py-1 rounded-full ${
+                            className={`text-xs font-medium px-3 py-1 rounded-full border border-gray-200 dark:border-dark-100 ${
                               course.status === "scheduled"
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                ? "bg-gray-50 text-gray-700 dark:bg-dark-200 dark:text-gray-300"
                                 : course.status === "live"
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                  ? "bg-primary-500/10 text-gray-800 dark:text-gray-200"
+                                  : "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-400"
                             }`}
                           >
                             {course.status === "scheduled"
@@ -882,17 +948,31 @@ const StudentELearning = () => {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => joinCourse(course.id)}
-                            className="w-full py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                            className="w-full py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
                           >
                             <VideoCameraIcon className="w-5 h-5" />
                             {t("elearning_join_course")}
                           </motion.button>
                         )}
-                        {course.status === "scheduled" && (
-                          <div className="w-full py-3 bg-gray-100 dark:bg-dark-200 text-gray-500 dark:text-gray-400 rounded-xl text-center font-medium">
-                            {t("elearning_starts_soon")}
-                          </div>
-                        )}
+                        {course.status === "scheduled" && (() => {
+                          const start = course.scheduled_at
+                            ? new Date(course.scheduled_at)
+                            : null;
+                          const past = start && start <= new Date();
+                          return (
+                            <div
+                              className={`w-full py-3 rounded-xl text-center font-medium ${
+                                past
+                                  ? "bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200"
+                                  : "bg-gray-100 dark:bg-dark-200 text-gray-500 dark:text-gray-400"
+                              }`}
+                            >
+                              {past
+                                ? t("elearning_waiting_teacher_start")
+                                : t("elearning_starts_soon")}
+                            </div>
+                          );
+                        })()}
                         {course.status === "ended" && course.recording_url && (
                           <button className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
                             <PlayIcon className="w-5 h-5" />
@@ -950,7 +1030,7 @@ const StudentELearning = () => {
                     <div className="flex items-center gap-2">
                       {material.external_url ? (
                         <button
-                          onClick={() => window.open(material.external_url, "_blank")}
+                          onClick={() => openExternalUrl(material.external_url)}
                           className="p-2 text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg"
                         >
                           <PlayIcon className="w-5 h-5" />
@@ -1004,7 +1084,7 @@ const StudentELearning = () => {
                           <ClipboardDocumentListIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                         </div>
                         {quiz.my_attempts > 0 && (
-                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span className="text-xs font-medium px-2 py-1 rounded-full border border-gray-200 dark:border-dark-100 bg-gray-50 text-gray-700 dark:bg-dark-200 dark:text-gray-300">
                             {t("elearning_score")}: {quiz.best_score?.toFixed(1)}/
                             {quiz.total_points}
                           </span>
@@ -1127,20 +1207,20 @@ const StudentELearning = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-4 flex-1">
                           <div
-                            className={`p-3 rounded-xl ${
+                            className={`p-3 rounded-xl border border-gray-200/80 dark:border-dark-100 ${
                               hasSubmitted
-                                ? "bg-green-100 dark:bg-green-900/30"
+                                ? "bg-gray-50 dark:bg-dark-200/50"
                                 : isOverdue
-                                  ? "bg-red-100 dark:bg-red-900/30"
-                                  : "bg-orange-100 dark:bg-orange-900/30"
+                                  ? "bg-gray-100 dark:bg-dark-200/70"
+                                  : "bg-gray-50 dark:bg-dark-200/50"
                             }`}
                           >
                             {hasSubmitted ? (
-                              <CheckCircleIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                              <CheckCircleIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                             ) : isOverdue ? (
-                              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400" />
+                              <ExclamationTriangleIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                             ) : (
-                              <FolderOpenIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                              <FolderOpenIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                             )}
                           </div>
                           <div className="flex-1">
@@ -1158,7 +1238,7 @@ const StudentELearning = () => {
                               <span
                                 className={
                                   isOverdue && !hasSubmitted
-                                    ? "text-red-500"
+                                    ? "text-gray-700 dark:text-gray-300 font-medium"
                                     : "text-gray-500"
                                 }
                               >
@@ -1171,7 +1251,7 @@ const StudentELearning = () => {
                                 })}
                               </span>
                               {hasSubmitted && (
-                                <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <span className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
                                   <CheckCircleIcon className="w-4 h-4" />
                                   {t("elearning_submitted")}
                                   {hasSubmitted.grade !== null &&
@@ -1199,7 +1279,7 @@ const StudentELearning = () => {
                               {t("elearning_view_submission")}
                             </button>
                           ) : (
-                            <span className="text-sm text-red-500">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
                               {t("elearning_deadline_passed")}
                             </span>
                           )}
@@ -1261,18 +1341,37 @@ const StudentELearning = () => {
                 )}
                 {/* File */}
                 {showViewSubmissionModal.submission?.file_name && (
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-200 rounded-xl">
-                    <DocumentTextIcon className="w-6 h-6 text-primary-500 flex-shrink-0" />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{showViewSubmissionModal.submission.file_name}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-200 rounded-xl">
+                      <DocumentTextIcon className="w-6 h-6 text-primary-500 flex-shrink-0" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 break-all">
+                        {showViewSubmissionModal.submission.file_name}
+                      </span>
+                    </div>
+                    {showViewSubmissionModal.submission?.id != null && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadSubmissionFile(
+                            showViewSubmissionModal.submission.id,
+                            showViewSubmissionModal.submission.file_name,
+                          )
+                        }
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-medium hover:bg-primary-600"
+                      >
+                        <ArrowDownTrayIcon className="w-5 h-5" />
+                        {t("elearning_download_file")}
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* Grade & feedback */}
                 {showViewSubmissionModal.submission?.grade !== null && showViewSubmissionModal.submission?.grade !== undefined && (
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider mb-1">{t("elearning_grade")}</p>
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-400">{showViewSubmissionModal.submission.grade} / {showViewSubmissionModal.assignment.total_points}</p>
+                  <div className="p-4 bg-gray-50 dark:bg-dark-200/80 rounded-xl border border-gray-200 dark:border-dark-100">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{t("elearning_grade")}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{showViewSubmissionModal.submission.grade} / {showViewSubmissionModal.assignment.total_points}</p>
                     {showViewSubmissionModal.submission?.feedback && (
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-2">{showViewSubmissionModal.submission.feedback}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{showViewSubmissionModal.submission.feedback}</p>
                     )}
                   </div>
                 )}

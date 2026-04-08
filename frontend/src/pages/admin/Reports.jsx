@@ -8,7 +8,7 @@ import {
 import { dashboardApi, classApi, teacherApi, courseApi, departmentApi } from '../../services/api'
 import StatCard from '../../components/StatCard'
 import { useI18n } from '../../i18n/index.jsx'
-import { esc, openReport } from '../../utils/reportPrint'
+import { esc, openReportAsyncSafe } from '../../utils/reportPrint'
 
 function generateColors(count) {
   const palette = [
@@ -22,6 +22,7 @@ function generateColors(count) {
 
 // ── Report Card ─────────────────────────────────────────────────────────────
 function ReportCard({ icon: Icon, iconBg, iconColor, title, description, onGenerate, loading, delay = 0 }) {
+  const { t } = useI18n()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -46,7 +47,7 @@ function ReportCard({ icon: Icon, iconBg, iconColor, title, description, onGener
           ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           : <PrinterIcon className="w-4 h-4" />
         }
-        {loading ? 'Génération…' : 'Voir le rapport'}
+        {loading ? t('generating') : t('view_report')}
       </button>
     </motion.div>
   )
@@ -77,53 +78,51 @@ export default function AdminReports() {
   const handleClasses = async () => {
     setLoadingClasses(true)
     try {
-      const res = await classApi.getAll({ per_page: 1000 })
-      const classes = res.data?.data?.data || res.data?.data || []
+      await openReportAsyncSafe(t('admin_report_classes_title'), async () => {
+        const res = await classApi.getAll({ per_page: 1000 })
+        const classes = res.data?.data?.data || res.data?.data || []
 
-      // Group by academic year
-      const byYear = {}
-      classes.forEach(c => {
-        const yr = c.academic_year || 'Année inconnue'
-        if (!byYear[yr]) byYear[yr] = []
-        byYear[yr].push(c)
-      })
+        const byYear = {}
+        classes.forEach(c => {
+          const yr = c.academic_year || 'Année inconnue'
+          if (!byYear[yr]) byYear[yr] = []
+          byYear[yr].push(c)
+        })
 
-      const sections = Object.entries(byYear).sort(([a], [b]) => b.localeCompare(a)).map(([yr, list]) => {
-        const rows = list.map(c => {
-          const tFn = esc(c.teacher?.user?.first_name || '')
-          const tLn = esc(c.teacher?.user?.last_name || '')
-          const teacher = tFn || tLn ? `${tFn} ${tLn}`.trim() : '—'
-          return `<tr>
-            <td><strong>${esc(c.course?.code || '—')}</strong></td>
-            <td>${esc(c.course?.name || '—')}</td>
-            <td style="text-align:center">${esc(c.course?.level || '—')}</td>
-            <td style="text-align:center">${esc(c.section || '—')}</td>
-            <td style="text-align:center">S${esc(String(c.semester || '—'))}</td>
-            <td>${teacher}</td>
-            <td>${esc(c.room || '—')}</td>
-            <td style="text-align:center">${esc(String(c.capacity || '—'))}</td>
-            <td>${esc(c.course?.department?.name || '—')}</td>
-          </tr>`
+        const sections = Object.entries(byYear).sort(([a], [b]) => b.localeCompare(a)).map(([yr, list]) => {
+          const rows = list.map(c => {
+            const tFn = esc(c.teacher?.user?.first_name || '')
+            const tLn = esc(c.teacher?.user?.last_name || '')
+            const teacher = tFn || tLn ? `${tFn} ${tLn}`.trim() : '—'
+            return `<tr>
+              <td><strong>${esc(c.course?.code || '—')}</strong></td>
+              <td>${esc(c.course?.name || '—')}</td>
+              <td style="text-align:center">${esc(c.course?.level || '—')}</td>
+              <td style="text-align:center">${esc(c.section || '—')}</td>
+              <td style="text-align:center">S${esc(String(c.semester || '—'))}</td>
+              <td>${teacher}</td>
+              <td>${esc(c.room || '—')}</td>
+              <td style="text-align:center">${esc(String(c.capacity || '—'))}</td>
+              <td>${esc(c.course?.department?.name || '—')}</td>
+            </tr>`
+          }).join('')
+          return `<div class="level-title">${esc(yr)} — ${list.length} classe${list.length > 1 ? 's' : ''}</div>
+            <table><thead><tr>
+              <th>Code</th><th>Cours</th><th style="text-align:center">Niveau</th>
+              <th style="text-align:center">Section</th><th style="text-align:center">Sem.</th>
+              <th>Professeur</th><th>Salle</th><th style="text-align:center">Capacité</th><th>Département</th>
+            </tr></thead><tbody>${rows}</tbody></table>`
         }).join('')
-        return `<div class="level-title">${esc(yr)} — ${list.length} classe${list.length > 1 ? 's' : ''}</div>
-          <table><thead><tr>
-            <th>Code</th><th>Cours</th><th style="text-align:center">Niveau</th>
-            <th style="text-align:center">Section</th><th style="text-align:center">Sem.</th>
-            <th>Professeur</th><th>Salle</th><th style="text-align:center">Capacité</th><th>Département</th>
-          </tr></thead><tbody>${rows}</tbody></table>`
-      }).join('')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px">
-          Total : <strong>${classes.length} classe${classes.length > 1 ? 's' : ''}</strong> sur <strong>${Object.keys(byYear).length} année${Object.keys(byYear).length > 1 ? 's' : ''}</strong>
-        </div>
-        ${sections}`
-
-      if (!openReport('Rapport des Classes', 'Liste Complète des Classes par Année Académique', body)) {
-        alert('Autorisez les pop-ups pour afficher le rapport')
-      }
+        const body = `
+          <div class="info-box">
+            Total : <strong>${classes.length} classe${classes.length > 1 ? 's' : ''}</strong> sur <strong>${Object.keys(byYear).length} année${Object.keys(byYear).length > 1 ? 's' : ''}</strong>
+          </div>
+          ${sections}`
+        return { subtitle: t('admin_report_classes_subtitle'), body }
+      })
     } catch {
-      alert('Erreur lors de la génération du rapport des classes')
+      alert(t('error'))
     } finally {
       setLoadingClasses(false)
     }
@@ -133,56 +132,56 @@ export default function AdminReports() {
   const handleTeachers = async () => {
     setLoadingTeachers(true)
     try {
-      const res = await teacherApi.getAll({ per_page: 1000 })
-      const teachers = res.data?.data?.data || res.data?.data || []
+      await openReportAsyncSafe(t('admin_report_teachers_title'), async () => {
+        const res = await teacherApi.getAll({ per_page: 1000 })
+        const teachers = res.data?.data?.data || res.data?.data || []
 
-      // Group by faculty → department
-      const byFaculty = {}
-      teachers.forEach(t => {
-        const fac = t.department?.faculty?.name || 'Sans Faculté'
-        const dept = t.department?.name || 'Sans Département'
-        if (!byFaculty[fac]) byFaculty[fac] = {}
-        if (!byFaculty[fac][dept]) byFaculty[fac][dept] = []
-        byFaculty[fac][dept].push(t)
-      })
+        const byFaculty = {}
+        teachers.forEach(t => {
+          const fac = t.department?.faculty?.name || 'Sans Faculté'
+          const dept = t.department?.name || 'Sans Département'
+          if (!byFaculty[fac]) byFaculty[fac] = {}
+          if (!byFaculty[fac][dept]) byFaculty[fac][dept] = []
+          byFaculty[fac][dept].push(t)
+        })
 
-      const sections = Object.entries(byFaculty).sort(([a], [b]) => a.localeCompare(b)).map(([fac, depts]) => {
-        const facTotal = Object.values(depts).reduce((s, a) => s + a.length, 0)
-        const deptSections = Object.entries(depts).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
-          const rows = list.map(t => {
-            const fn = esc(t.user?.first_name || '')
-            const ln = esc(t.user?.last_name || '')
-            const stCls = t.user?.status === 'inactive' ? 'r' : 'g'
-            const stLbl = t.user?.status === 'inactive' ? 'Inactif' : 'Actif'
-            return `<tr>
-              <td style="font-family:monospace;font-size:10px">${esc(t.employee_id || '—')}</td>
-              <td><strong>${fn} ${ln}</strong></td>
-              <td>${esc(t.user?.email || '—')}</td>
-              <td>${esc(t.user?.phone || '—')}</td>
-              <td style="text-align:center"><span class="badge ${stCls}">${stLbl}</span></td>
-            </tr>`
+        const sections = Object.entries(byFaculty).sort(([a], [b]) => a.localeCompare(b)).map(([fac, depts]) => {
+          const facTotal = Object.values(depts).reduce((s, a) => s + a.length, 0)
+          const deptSections = Object.entries(depts).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
+            const rows = list.map(t => {
+              const fn = esc(t.user?.first_name || '')
+              const ln = esc(t.user?.last_name || '')
+              const username = esc(t.user?.username || '—')
+              const rawStatus = t.user?.status ?? t.status ?? ''
+              const stLbl = rawStatus === 'inactive' ? 'Inactif' : rawStatus === 'on_leave' ? 'En congé' : rawStatus === 'suspended' ? 'Suspendu' : 'Actif'
+              return `<tr>
+                <td style="font-family:monospace;font-size:10px">${esc(t.employee_id || '—')}</td>
+                <td><strong>${fn} ${ln}</strong></td>
+                <td style="font-family:monospace;font-size:10px">${username}</td>
+                <td>${esc(t.user?.email || '—')}</td>
+                <td>${esc(t.user?.phone || '—')}</td>
+                <td style="text-align:center"><span class="badge">${stLbl}</span></td>
+              </tr>`
+            }).join('')
+            return `<div class="dept-title">${esc(dept)} (${list.length})</div>
+              <table><thead><tr>
+                <th>ID Employé</th><th>Nom Complet</th><th>Nom d'utilisateur</th><th>Email</th><th>Téléphone</th>
+                <th style="text-align:center">Statut</th>
+              </tr></thead><tbody>${rows}</tbody></table>`
           }).join('')
-          return `<div class="dept-title">${esc(dept)} (${list.length})</div>
-            <table><thead><tr>
-              <th>ID Employé</th><th>Nom Complet</th><th>Email</th><th>Téléphone</th>
-              <th style="text-align:center">Statut</th>
-            </tr></thead><tbody>${rows}</tbody></table>`
+          return `<div class="faculty-title">${esc(fac)} — ${facTotal} enseignant${facTotal > 1 ? 's' : ''}</div>${deptSections}`
         }).join('')
-        return `<div class="faculty-title">${esc(fac)} — ${facTotal} enseignant${facTotal > 1 ? 's' : ''}</div>${deptSections}`
-      }).join('')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px">
-          Total : <strong>${teachers.length} enseignant${teachers.length > 1 ? 's' : ''}</strong>
-          dans <strong>${Object.keys(byFaculty).length} faculté${Object.keys(byFaculty).length > 1 ? 's' : ''}</strong>
-        </div>
-        ${sections}`
-
-      if (!openReport('Rapport des Enseignants', 'Liste des Enseignants par Faculté et Département', body)) {
-        alert('Autorisez les pop-ups pour afficher le rapport')
-      }
+        const body = `
+          <div class="info-box">
+            Total : <strong>${teachers.length} enseignant${teachers.length > 1 ? 's' : ''}</strong>
+            dans <strong>${Object.keys(byFaculty).length} faculté${Object.keys(byFaculty).length > 1 ? 's' : ''}</strong>
+          </div>
+          ${sections}`
+        return { subtitle: t('admin_report_teachers_subtitle'), body }
+      })
     } catch {
-      alert('Erreur lors de la génération du rapport des enseignants')
+      alert(t('error'))
     } finally {
       setLoadingTeachers(false)
     }
@@ -192,59 +191,56 @@ export default function AdminReports() {
   const handleCourses = async () => {
     setLoadingCourses(true)
     try {
-      const [coursesRes, deptsRes] = await Promise.all([
-        courseApi.getAll({ per_page: 2000 }),
-        departmentApi.getAll({ per_page: 200 }),
-      ])
-      const courses = coursesRes.data?.data?.data || coursesRes.data?.data || []
+      await openReportAsyncSafe(t('admin_report_courses_title'), async () => {
+        const [coursesRes] = await Promise.all([
+          courseApi.getAll({ per_page: 2000 }),
+          departmentApi.getAll({ per_page: 200 }),
+        ])
+        const courses = coursesRes.data?.data?.data || coursesRes.data?.data || []
 
-      // Group by department
-      const byDept = {}
-      courses.forEach(c => {
-        const dept = c.department?.name || 'Sans Département'
-        if (!byDept[dept]) byDept[dept] = []
-        byDept[dept].push(c)
-      })
-
-      const LEVEL_ORDER = ['L1','L2','L3','M1','M2','D1','D2','D3']
-      const sections = Object.entries(byDept).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
-        const sorted = [...list].sort((a, b) => {
-          const ia = LEVEL_ORDER.indexOf(a.level), ib = LEVEL_ORDER.indexOf(b.level)
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.semester - b.semester
+        const byDept = {}
+        courses.forEach(c => {
+          const dept = c.department?.name || 'Sans Département'
+          if (!byDept[dept]) byDept[dept] = []
+          byDept[dept].push(c)
         })
-        const rows = sorted.map(c => {
-          const actCls = c.is_active ? 'g' : 'r'
-          const actLbl = c.is_active ? 'Actif' : 'Inactif'
-          return `<tr>
-            <td style="font-family:monospace;font-size:10px"><strong>${esc(c.code || '—')}</strong></td>
-            <td>${esc(c.name || '—')}</td>
-            <td style="text-align:center">${esc(c.level || '—')}</td>
-            <td style="text-align:center">S${esc(String(c.semester || '—'))}</td>
-            <td style="text-align:center">${esc(String(c.credits || 0))}</td>
-            <td>${esc(c.course_type || '—')}</td>
-            <td style="text-align:center"><span class="badge ${actCls}">${actLbl}</span></td>
-          </tr>`
+
+        const LEVEL_ORDER = ['L1','L2','L3','M1','M2','D1','D2','D3']
+        const sections = Object.entries(byDept).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
+          const sorted = [...list].sort((a, b) => {
+            const ia = LEVEL_ORDER.indexOf(a.level), ib = LEVEL_ORDER.indexOf(b.level)
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.semester - b.semester
+          })
+          const rows = sorted.map(c => {
+            const actLbl = c.is_active ? 'Actif' : 'Inactif'
+            return `<tr>
+              <td style="font-family:monospace;font-size:10px"><strong>${esc(c.code || '—')}</strong></td>
+              <td>${esc(c.name || '—')}</td>
+              <td style="text-align:center">${esc(c.level || '—')}</td>
+              <td style="text-align:center">S${esc(String(c.semester || '—'))}</td>
+              <td style="text-align:center">${esc(String(c.credits || 0))}</td>
+              <td>${esc(c.course_type || '—')}</td>
+              <td style="text-align:center"><span class="badge">${actLbl}</span></td>
+            </tr>`
+          }).join('')
+          return `<div class="level-title">${esc(dept)} (${list.length} cours)</div>
+            <table><thead><tr>
+              <th>Code</th><th>Intitulé</th><th style="text-align:center">Niveau</th>
+              <th style="text-align:center">Sem.</th><th style="text-align:center">Crédits</th>
+              <th>Type</th><th style="text-align:center">Statut</th>
+            </tr></thead><tbody>${rows}</tbody></table>`
         }).join('')
-        return `<div class="level-title">${esc(dept)} (${list.length} cours)</div>
-          <table><thead><tr>
-            <th>Code</th><th>Intitulé</th><th style="text-align:center">Niveau</th>
-            <th style="text-align:center">Sem.</th><th style="text-align:center">Crédits</th>
-            <th>Type</th><th style="text-align:center">Statut</th>
-          </tr></thead><tbody>${rows}</tbody></table>`
-      }).join('')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px">
-          Total : <strong>${courses.length} cours</strong> dans <strong>${Object.keys(byDept).length} département${Object.keys(byDept).length > 1 ? 's' : ''}</strong>
-          &nbsp;·&nbsp; Actifs : <strong>${courses.filter(c => c.is_active).length}</strong>
-        </div>
-        ${sections}`
-
-      if (!openReport('Liste des Cours', 'Catalogue Complet des Cours par Département', body)) {
-        alert('Autorisez les pop-ups pour afficher le rapport')
-      }
+        const body = `
+          <div class="info-box">
+            Total : <strong>${courses.length} cours</strong> dans <strong>${Object.keys(byDept).length} département${Object.keys(byDept).length > 1 ? 's' : ''}</strong>
+            &nbsp;·&nbsp; Actifs : <strong>${courses.filter(c => c.is_active).length}</strong>
+          </div>
+          ${sections}`
+        return { subtitle: t('admin_report_courses_subtitle'), body }
+      })
     } catch {
-      alert('Erreur lors de la génération de la liste des cours')
+      alert(t('error'))
     } finally {
       setLoadingCourses(false)
     }
@@ -276,10 +272,10 @@ export default function AdminReports() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Students" value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
-        <StatCard title="Active Students" value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
-        <StatCard title="Total Teachers" value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
-        <StatCard title="Active Teachers" value={stats?.stats?.active_teachers || 0} icon={UsersIcon} color="purple" delay={0.3} />
+        <StatCard title={t('reports_total_students')} value={stats?.stats?.total_students || 0} icon={UserGroupIcon} color="primary" />
+        <StatCard title={t('reports_active_students')} value={stats?.stats?.active_students || 0} icon={UserGroupIcon} color="teal" delay={0.1} />
+        <StatCard title={t('reports_total_teachers')} value={stats?.stats?.total_teachers || 0} icon={UsersIcon} color="blue" delay={0.2} />
+        <StatCard title={t('reports_active_teachers')} value={stats?.stats?.active_teachers || 0} icon={UsersIcon} color="purple" delay={0.3} />
       </div>
 
       {/* Charts */}

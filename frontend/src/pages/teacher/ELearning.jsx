@@ -27,6 +27,13 @@ import {
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 import { useI18n } from "../../i18n/index.jsx";
+import { toDatetimeLocalValue, datetimeLocalToIsoUtc } from "../../utils/datetimeLocal";
+import {
+  openReportAsync,
+  buildOnlineCourseAttendanceReportBody,
+  buildReportDocumentHtml,
+  buildQuizResultsReportBody,
+} from "../../utils/reportPrint";
 
 const ELearning = () => {
   const { t } = useI18n();
@@ -42,6 +49,7 @@ const ELearning = () => {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [editingCourse, setEditingCourse] = useState(null);
+  const [sessionReportLoadingId, setSessionReportLoadingId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -118,8 +126,9 @@ const ELearning = () => {
   const startCourse = async (id) => {
     try {
       const res = await api.post(`/elearning/courses/${id}/start`);
+      const updated = res.data.course;
       setOnlineCourses((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: "live" } : c))
+        prev.map((c) => (c.id === id ? { ...c, ...updated, status: "live" } : c))
       );
       if (res.data.meeting_url) {
         window.open(res.data.meeting_url, "_blank", "noopener,noreferrer");
@@ -132,9 +141,10 @@ const ELearning = () => {
 
   const endCourse = async (id) => {
     try {
-      await api.post(`/elearning/courses/${id}/end`);
+      const res = await api.post(`/elearning/courses/${id}/end`);
+      const updated = res.data.course;
       setOnlineCourses((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: "ended" } : c))
+        prev.map((c) => (c.id === id ? { ...c, ...updated, status: "ended" } : c))
       );
       toast.success(t('session_ended'));
     } catch (err) {
@@ -157,7 +167,7 @@ const ELearning = () => {
   };
 
   const deleteMaterial = async (id) => {
-    if (!confirm("Supprimer ce document?")) return;
+    if (!confirm(t("confirm_delete_document"))) return;
     try {
       await api.delete(`/elearning/materials/${id}`);
       toast.success(t('item_deleted'));
@@ -178,7 +188,7 @@ const ELearning = () => {
   };
 
   const deleteQuiz = async (id) => {
-    if (!confirm("Supprimer ce quiz et toutes les tentatives?")) return;
+    if (!confirm(t("confirm_delete_quiz_with_attempts"))) return;
     try {
       await api.delete(`/elearning/quizzes/${id}`);
       toast.success(t('quiz_deleted'));
@@ -199,7 +209,7 @@ const ELearning = () => {
   };
 
   const deleteAssignment = async (id) => {
-    if (!confirm("Supprimer ce devoir et toutes les soumissions?")) return;
+    if (!confirm(t("confirm_delete_assignment_with_submissions"))) return;
     try {
       await api.delete(`/elearning/assignments/${id}`);
       toast.success(t('assignment_deleted'));
@@ -212,25 +222,25 @@ const ELearning = () => {
   const tabs = [
     {
       id: "courses",
-      name: "Cours en Ligne",
+      name: t("elearning_courses"),
       icon: VideoCameraIcon,
       count: onlineCourses.length,
     },
     {
       id: "materials",
-      name: "Documents",
+      name: t("elearning_documents"),
       icon: DocumentTextIcon,
       count: materials.length,
     },
     {
       id: "quizzes",
-      name: "Quiz",
+      name: t("elearning_quizzes"),
       icon: ClipboardDocumentListIcon,
       count: quizzes.length,
     },
     {
       id: "assignments",
-      name: "Devoirs",
+      name: t("elearning_assignments"),
       icon: FolderPlusIcon,
       count: assignments.length,
     },
@@ -270,6 +280,8 @@ const ELearning = () => {
       title: "",
       description: "",
       external_url: "",
+      scheduled_at: "",
+      duration_minutes: 60,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -277,10 +289,13 @@ const ELearning = () => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
         await api.post("/elearning/courses", {
-          ...formData,
-          scheduled_at: toUTC(formData.scheduled_at),
+          class_id: formData.class_id,
+          title: formData.title,
+          description: formData.description,
+          external_url: formData.external_url,
+          scheduled_at: datetimeLocalToIsoUtc(formData.scheduled_at),
+          duration_minutes: formData.duration_minutes || 60,
         });
         toast.success(t('course_online_created'));
         setShowModal(null);
@@ -295,10 +310,10 @@ const ELearning = () => {
     };
 
     return (
-      <Modal title="Créer un Cours en Ligne" onClose={() => setShowModal(null)}>
+      <Modal title={`${t("create")} — ${t("elearning_courses")}`} onClose={() => setShowModal(null)}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label">Classe</label>
+            <label className="label">{t("class")}</label>
             <select
               value={formData.class_id}
               onChange={(e) =>
@@ -307,7 +322,7 @@ const ELearning = () => {
               className="input"
               required
             >
-              <option value="">Sélectionner une classe</option>
+              <option value="">{t("elearning_select_class")}</option>
               {(Array.isArray(myCourses) ? myCourses : []).map((c) => (
                 <option
                   key={c.id}
@@ -318,7 +333,7 @@ const ELearning = () => {
           </div>
 
           <div>
-            <label className="label">Lien Google Meet (URL)</label>
+            <label className="label">{t("elearning_meeting_link_label")}</label>
             <input
               type="url"
               value={formData.external_url}
@@ -326,13 +341,13 @@ const ELearning = () => {
                 setFormData({ ...formData, external_url: e.target.value })
               }
               className="input"
-              placeholder="https://meet.google.com/xxx-xxxx-xxx"
+              placeholder={t("elearning_meeting_link_placeholder")}
               required
             />
           </div>
 
           <div>
-            <label className="label">Titre de la session</label>
+            <label className="label">{t("title")}</label>
             <input
               type="text"
               value={formData.title}
@@ -340,13 +355,13 @@ const ELearning = () => {
                 setFormData({ ...formData, title: e.target.value })
               }
               className="input"
-              placeholder="Ex: Introduction au chapitre 3"
+              placeholder={t("elearning_session_title_placeholder")}
               required
             />
           </div>
 
           <div>
-            <label className="label">Description</label>
+            <label className="label">{t("description")}</label>
             <textarea
               value={formData.description}
               onChange={(e) =>
@@ -354,8 +369,37 @@ const ELearning = () => {
               }
               className="input"
               rows={3}
-              placeholder="Description du cours..."
+              placeholder={t("elearning_course_description_placeholder")}
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">{t("date_time")}</label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_at}
+                onChange={(e) =>
+                  setFormData({ ...formData, scheduled_at: e.target.value })
+                }
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">{t("duration_minutes")}</label>
+              <input
+                type="number"
+                min={15}
+                value={formData.duration_minutes}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    duration_minutes: parseInt(e.target.value, 10) || 60,
+                  })
+                }
+                className="input"
+              />
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -364,14 +408,14 @@ const ELearning = () => {
               onClick={() => setShowModal(null)}
               className="btn-secondary flex-1"
             >
-              Annuler
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="btn-primary flex-1"
             >
-              {isSubmitting ? "Création..." : "Créer le cours"}
+              {isSubmitting ? t("creating") : t("create")}
             </button>
           </div>
         </form>
@@ -384,21 +428,29 @@ const ELearning = () => {
       title: editingCourse?.title ?? "",
       description: editingCourse?.description ?? "",
       meeting_url: editingCourse?.meeting_url ?? "",
-      scheduled_at: editingCourse?.scheduled_at
-        ? new Date(editingCourse.scheduled_at).toISOString().slice(0, 16)
-        : "",
+      scheduled_at: toDatetimeLocalValue(editingCourse?.scheduled_at),
       duration_minutes: editingCourse?.duration_minutes ?? 60,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+      if (!editingCourse) return;
+      setFormData({
+        title: editingCourse.title ?? "",
+        description: editingCourse.description ?? "",
+        meeting_url: editingCourse.meeting_url ?? "",
+        scheduled_at: toDatetimeLocalValue(editingCourse.scheduled_at),
+        duration_minutes: editingCourse.duration_minutes ?? 60,
+      });
+    }, [editingCourse?.id]);
 
     const handleSubmit = async (e) => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-        const toUTC = (val) => (val ? new Date(val).toISOString() : null);
         await handleUpdateCourse(editingCourse.id, {
           ...formData,
-          scheduled_at: toUTC(formData.scheduled_at),
+          scheduled_at: datetimeLocalToIsoUtc(formData.scheduled_at),
         });
       } finally {
         setIsSubmitting(false);
@@ -784,14 +836,14 @@ const ELearning = () => {
     };
 
     return (
-      <Modal title="Créer un Quiz" onClose={() => setShowModal(null)} size="lg">
+      <Modal title={`${t("create")} — ${t("elearning_quizzes")}`} onClose={() => setShowModal(null)} size="lg">
         <form
           onSubmit={handleSubmit}
           className="space-y-4 max-h-[65vh] overflow-y-auto pr-2"
         >
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">Cours</label>
+              <label className="label">{t("course")}</label>
               <select
                 value={formData.course_id}
                 onChange={(e) =>
@@ -800,7 +852,7 @@ const ELearning = () => {
                 className="input"
                 required
               >
-                <option value="">Sélectionner</option>
+                <option value="">{t("select")}</option>
                 {myCourses.map((course) => (
                   <option
                     key={course.course_id || course.id}
@@ -812,7 +864,7 @@ const ELearning = () => {
               </select>
             </div>
             <div>
-              <label className="label">Titre</label>
+              <label className="label">{t("title")}</label>
               <input
                 type="text"
                 value={formData.title}
@@ -827,7 +879,7 @@ const ELearning = () => {
 
           <div className="grid grid-cols-4 gap-4">
             <div>
-              <label className="label">Durée (min)</label>
+              <label className="label">{t("duration_minutes")}</label>
               <input
                 type="number"
                 value={formData.duration_minutes}
@@ -842,7 +894,7 @@ const ELearning = () => {
               />
             </div>
             <div>
-              <label className="label">Total points</label>
+              <label className="label">{t("total_points")}</label>
               <input
                 type="number"
                 value={formData.total_points}
@@ -1327,73 +1379,30 @@ const ELearning = () => {
 
     const handlePrint = () => {
       if (!data) return;
-      const quiz = data.quiz;
-      const stats = data.stats;
-      const attempts = data.attempts || [];
-      const printDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
-
-      const rows = attempts.map((a) => `
-        <tr>
-          <td>${a.student?.name || '—'}</td>
-          <td>${a.student?.registration_number || '—'}</td>
-          <td class="${a.score >= quiz.passing_score ? 'pass' : 'fail'}">${typeof a.score === 'number' ? a.score.toFixed(1) : a.score}/${quiz.total_points}</td>
-          <td>${a.correct_count}/${a.total_questions}</td>
-          <td>${a.completed_at ? new Date(a.completed_at).toLocaleString('fr-FR') : '—'}</td>
-        </tr>`).join('');
-
-      const html = `<!DOCTYPE html><html lang="fr"><head>
-        <meta charset="UTF-8"/>
-        <title>Résultats: ${quiz?.title}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 30px; color: #111; font-size: 13px; }
-          .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1e40af; padding-bottom: 16px; }
-          .header img { height: 70px; margin-bottom: 8px; }
-          .header h1 { font-size: 18px; color: #1e40af; margin: 4px 0; }
-          .header h2 { font-size: 14px; font-weight: normal; margin: 2px 0; color: #444; }
-          .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; color: #555; }
-          .stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 20px; }
-          .stat-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; }
-          .stat-box .val { font-size: 20px; font-weight: bold; color: #1e40af; }
-          .stat-box .lbl { font-size: 11px; color: #666; margin-top: 2px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
-          td { padding: 7px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-          tr:nth-child(even) td { background: #f8f9fa; }
-          .pass { color: #16a34a; font-weight: bold; }
-          .fail { color: #dc2626; font-weight: bold; }
-          @media print { body { margin: 15px; } }
-        </style>
-      </head><body>
-        <div class="header">
-          <img src="/esl-logo.png" onerror="this.style.display='none'"/>
-          <h1>École de santé de Libreville</h1>
-          <h2>Résultats du Quiz — ${quiz?.title || ''}</h2>
-        </div>
-        <div class="meta">
-          <span>Cours: ${selectedCourse?.name || selectedCourse?.class?.course?.name || '—'}</span>
-          <span>Seuil de réussite: ${quiz?.passing_score}/${quiz?.total_points}</span>
-          <span>Imprimé le ${printDate}</span>
-        </div>
-        <div class="stats">
-          <div class="stat-box"><div class="val">${stats?.total_attempts ?? 0}</div><div class="lbl">Tentatives</div></div>
-          <div class="stat-box"><div class="val">${typeof stats?.average_score === 'number' ? stats.average_score.toFixed(1) : '—'}</div><div class="lbl">Moyenne</div></div>
-          <div class="stat-box"><div class="val" style="color:#16a34a">${typeof stats?.highest_score === 'number' ? stats.highest_score.toFixed(1) : '—'}</div><div class="lbl">Maximum</div></div>
-          <div class="stat-box"><div class="val" style="color:#dc2626">${typeof stats?.lowest_score === 'number' ? stats.lowest_score.toFixed(1) : '—'}</div><div class="lbl">Minimum</div></div>
-          <div class="stat-box"><div class="val">${typeof stats?.pass_rate === 'number' ? stats.pass_rate.toFixed(0) : '—'}%</div><div class="lbl">Taux de réussite</div></div>
-        </div>
-        <table>
-          <thead><tr>
-            <th>Étudiant</th><th>Matricule</th><th>Score</th><th>Réponses correctes</th><th>Date</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </body></html>`;
-
-      const pw = window.open('', '_blank');
-      pw.document.write(html);
-      pw.document.close();
-      pw.focus();
-      setTimeout(() => { pw.print(); }, 400);
+      const courseName =
+        selectedCourse?.name ||
+        selectedCourse?.class?.course?.name ||
+        '—';
+      const body = buildQuizResultsReportBody({
+        quiz: data.quiz,
+        stats: data.stats,
+        attempts: data.attempts || [],
+        courseName,
+      });
+      const html = buildReportDocumentHtml(
+        'Résultats du quiz',
+        data.quiz?.title || '',
+        body,
+      );
+      try {
+        const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+        sessionStorage.setItem(`esl_report:${key}`, html);
+        const url = `${window.location.origin}/report-viewer?key=${encodeURIComponent(key)}`;
+        const w = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!w) toast.error(t('popup_blocked'));
+      } catch {
+        toast.error(t('error'));
+      }
     };
 
     if (loading)
@@ -1423,36 +1432,36 @@ const ELearning = () => {
             </button>
           </div>
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-4">
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.total_attempts}
               </p>
-              <p className="text-xs text-gray-500">Tentatives</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Tentatives</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.average_score?.toFixed(1)}
               </p>
-              <p className="text-xs text-gray-500">Moyenne</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Moyenne</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.highest_score?.toFixed(1)}
               </p>
-              <p className="text-xs text-gray-500">Max</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Max</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-red-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/50 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-700 dark:text-gray-200 tabular-nums">
                 {data?.stats?.lowest_score?.toFixed(1)}
               </p>
-              <p className="text-xs text-gray-500">Min</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Min</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-primary-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center sm:col-span-1 col-span-2">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.pass_rate?.toFixed(0)}%
               </p>
-              <p className="text-xs text-gray-500">Réussite</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Réussite</p>
             </div>
           </div>
 
@@ -1479,10 +1488,19 @@ const ELearning = () => {
                       </p>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span
-                        className={`font-semibold ${attempt.score >= data.quiz.passing_score ? "text-green-600" : "text-red-600"}`}
-                      >
+                      <span className="font-semibold text-gray-900 dark:text-white tabular-nums">
                         {attempt.score?.toFixed(1)}/{data.quiz.total_points}
+                      </span>
+                      <span
+                        className={`ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                          attempt.score >= data.quiz.passing_score
+                            ? "border-gray-300 bg-gray-100 text-gray-700 dark:bg-dark-100 dark:border-dark-100 dark:text-gray-300"
+                            : "border-gray-300 bg-gray-100 text-gray-600 dark:bg-dark-100 dark:border-dark-100 dark:text-gray-400"
+                        }`}
+                      >
+                        {attempt.score >= data.quiz.passing_score
+                          ? "Réussi"
+                          : "Non reçu"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
@@ -1592,29 +1610,29 @@ const ELearning = () => {
           )}
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.total_enrolled}
               </p>
-              <p className="text-xs text-gray-500">Inscrits</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Inscrits</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.total_submitted}
               </p>
-              <p className="text-xs text-gray-500">Soumis</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Soumis</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-primary-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                 {data?.stats?.total_graded}
               </p>
-              <p className="text-xs text-gray-500">Notés</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Notés</p>
             </div>
-            <div className="bg-gray-50 dark:bg-dark-200 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-orange-600">
+            <div className="bg-gray-50 dark:bg-dark-200 rounded-xl border border-gray-200/80 dark:border-dark-100 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 tabular-nums">
                 {data?.stats?.total_late}
               </p>
-              <p className="text-xs text-gray-500">En retard</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">En retard</p>
             </div>
           </div>
 
@@ -1659,7 +1677,7 @@ const ELearning = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${sub.is_late ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}
+                        className={`px-2 py-1 rounded-full text-xs border border-gray-200 dark:border-dark-100 ${sub.is_late ? "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-300" : "bg-gray-50 text-gray-700 dark:bg-dark-200 dark:text-gray-300"}`}
                       >
                         {sub.is_late ? "En retard" : "À temps"}
                       </span>
@@ -1750,6 +1768,31 @@ const ELearning = () => {
     );
   };
 
+  const openSessionAttendanceReport = async (sessionId) => {
+    setSessionReportLoadingId(sessionId);
+    try {
+      const title = "Présence — cours en ligne";
+      const ok = await openReportAsync(title, async () => {
+        const res = await api.get(
+          `/elearning/courses/${sessionId}/attendance-report`,
+        );
+        const session = res.data?.session ?? {};
+        const coursePart = session.course_name
+          ? ` — ${session.course_name}`
+          : "";
+        return {
+          subtitle: `${session.title || `Session #${sessionId}`}${coursePart}`,
+          body: buildOnlineCourseAttendanceReportBody(res.data),
+        };
+      });
+      if (!ok) toast.error(t("popup_blocked"));
+    } catch {
+      toast.error(t("error"));
+    } finally {
+      setSessionReportLoadingId(null);
+    }
+  };
+
   // ==================== COMPONENTS ====================
 
   const EmptyState = ({
@@ -1773,7 +1816,14 @@ const ELearning = () => {
     </div>
   );
 
-  const CourseCard = ({ course, onStart, onEnd, onEdit }) => (
+  const CourseCard = ({
+    course,
+    onStart,
+    onEnd,
+    onEdit,
+    onOpenReport,
+    sessionReportLoadingId,
+  }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1781,11 +1831,11 @@ const ELearning = () => {
     >
       <div className="flex items-start justify-between mb-3">
         <div
-          className={`p-2 rounded-lg ${course.status === "live" ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}
+          className={`p-2 rounded-lg ${course.status === "live" ? "bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200" : "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-300"}`}
         >
           {course.status === "live" ? (
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
               <VideoCameraIcon className="w-5 h-5" />
             </div>
           ) : (
@@ -1793,7 +1843,7 @@ const ELearning = () => {
           )}
         </div>
         <span
-          className={`text-xs font-medium px-2 py-1 rounded-full ${course.status === "scheduled" ? "bg-yellow-100 text-yellow-700" : course.status === "live" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}
+          className={`text-xs font-medium px-2 py-1 rounded-full border border-gray-200 dark:border-dark-100 ${course.status === "scheduled" ? "bg-gray-50 text-gray-700 dark:bg-dark-200 dark:text-gray-300" : course.status === "live" ? "bg-primary-500/10 text-gray-800 dark:text-gray-200" : "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-400"}`}
         >
           {course.status === "scheduled"
             ? "Programmé"
@@ -1808,7 +1858,7 @@ const ELearning = () => {
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
         {course.course?.name}
       </p>
-      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400 mb-4">
         <span className="flex items-center gap-1">
           <ClockIcon className="w-4 h-4" />
           {course.duration_minutes} min
@@ -1816,37 +1866,56 @@ const ELearning = () => {
         {course.scheduled_at && (
           <span className="flex items-center gap-1">
             <CalendarIcon className="w-4 h-4" />
-            {new Date(course.scheduled_at).toLocaleDateString("fr-FR")}
+            {new Date(course.scheduled_at).toLocaleString("fr-FR", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
           </span>
         )}
+        <span className="flex items-center gap-1">
+          <UserGroupIcon className="w-4 h-4" />
+          {course.attendance_count ?? course.attendance?.length ?? 0}
+        </span>
       </div>
-      <div className="flex gap-2">
-        {course.status === "scheduled" && (
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {course.status === "scheduled" && (
+            <button
+              onClick={() => onStart(course.id)}
+              className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600">
+              Démarrer
+            </button>
+          )}
+          {course.status === "live" && (
+            <>
+              <button
+                onClick={() => course.meeting_url && window.open(course.meeting_url, "_blank", "noopener,noreferrer")}
+                className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
+                Rejoindre
+              </button>
+              <button
+                onClick={() => onEnd(course.id)}
+                className="py-2 px-3 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+                title="Terminer la session">
+                ⏹
+              </button>
+            </>
+          )}
           <button
-            onClick={() => onStart(course.id)}
-            className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600">
-            Démarrer
+            type="button"
+            onClick={() => onEdit(course)}
+            className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-lg">
+            <PencilIcon className="w-4 h-4" />
           </button>
-        )}
-        {course.status === "live" && (
-          <>
-            <button
-              onClick={() => course.meeting_url && window.open(course.meeting_url, "_blank", "noopener,noreferrer")}
-              className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
-              Rejoindre
-            </button>
-            <button
-              onClick={() => onEnd(course.id)}
-              className="py-2 px-3 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
-              title="Terminer la session">
-              ⏹
-            </button>
-          </>
-        )}
+        </div>
         <button
-          onClick={() => onEdit(course)}
-          className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-lg">
-          <PencilIcon className="w-4 h-4" />
+          type="button"
+          disabled={sessionReportLoadingId !== null}
+          onClick={() => onOpenReport(course.id)}
+          className="w-full py-2 text-center rounded-lg text-sm font-medium border border-gray-200 dark:border-dark-100 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-200 disabled:opacity-50 disabled:cursor-not-allowed">
+          {sessionReportLoadingId === course.id
+            ? t("loading")
+            : t("elearning_view_session_report")}
         </button>
       </div>
     </motion.div>
@@ -1897,7 +1966,7 @@ const ELearning = () => {
           <ClipboardDocumentListIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
         </div>
         <span
-          className={`text-xs font-medium px-2 py-1 rounded-full ${quiz.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-700 dark:bg-dark-100 dark:text-gray-400"}`}
+          className={`text-xs font-medium px-2 py-1 rounded-full border border-gray-200 dark:border-dark-100 ${quiz.status === "published" ? "bg-primary-500/10 text-gray-800 dark:text-gray-200" : "bg-gray-100 text-gray-600 dark:bg-dark-100 dark:text-gray-400"}`}
         >
           {quiz.status === "published" ? t("published") : t("draft")}
         </span>
@@ -1935,7 +2004,7 @@ const ELearning = () => {
         {quiz.status === "draft" && (
           <button
             onClick={() => publishQuiz(quiz.id)}
-            className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+            className="flex-1 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
           >
             {t("publish")}
           </button>
@@ -1953,7 +2022,7 @@ const ELearning = () => {
         )}
         <button
           onClick={() => deleteQuiz(quiz.id)}
-          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+          className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-100 dark:text-gray-400 rounded-lg"
         >
           <TrashIcon className="w-4 h-4" />
         </button>
@@ -1968,8 +2037,8 @@ const ELearning = () => {
       <div className="card p-5">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4 flex-1">
-            <div className="p-3 rounded-xl bg-orange-100 dark:bg-orange-900/30">
-              <FolderPlusIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            <div className="p-3 rounded-xl border border-gray-200/80 dark:border-dark-100 bg-gray-50 dark:bg-dark-200/50">
+              <FolderPlusIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
@@ -1977,7 +2046,7 @@ const ELearning = () => {
                   {assignment.title}
                 </h3>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${assignment.status === "published" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}
+                  className={`text-xs px-2 py-0.5 rounded-full border border-gray-200 dark:border-dark-100 ${assignment.status === "published" ? "bg-primary-500/10 text-gray-800 dark:text-gray-200" : "bg-gray-100 text-gray-600 dark:bg-dark-100 dark:text-gray-400"}`}
                 >
                   {assignment.status === "published" ? "Publié" : "Brouillon"}
                 </span>
@@ -1990,7 +2059,7 @@ const ELearning = () => {
                   <AcademicCapIcon className="w-4 h-4 inline mr-1" />
                   {assignment.total_points} points
                 </span>
-                <span className={isOverdue ? "text-red-500" : "text-gray-500"}>
+                <span className={isOverdue ? "text-gray-700 dark:text-gray-300 font-medium" : "text-gray-500"}>
                   <CalendarIcon className="w-4 h-4 inline mr-1" />
                   {new Date(assignment.due_date).toLocaleDateString("fr-FR")}
                 </span>
@@ -2001,7 +2070,7 @@ const ELearning = () => {
             {assignment.status === "draft" && (
               <button
                 onClick={() => publishAssignment(assignment.id)}
-                className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm"
+                className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700"
               >
                 Publier
               </button>
@@ -2135,6 +2204,8 @@ const ELearning = () => {
                       onStart={startCourse}
                       onEnd={endCourse}
                       onEdit={setEditingCourse}
+                      onOpenReport={openSessionAttendanceReport}
+                      sessionReportLoadingId={sessionReportLoadingId}
                     />
                   ))}
                 </div>

@@ -8,7 +8,8 @@ import {
   PrinterIcon,
 } from '@heroicons/react/24/outline'
 import { registrarApi, studentApi, teacherApi } from '../../services/api'
-import { esc, openReport } from '../../utils/reportPrint'
+import { useI18n } from '../../i18n/index.jsx'
+import { esc, openReportAsyncSafe } from '../../utils/reportPrint'
 
 const ROLES = ['admin', 'finance', 'registrar', 'teacher', 'student']
 const ROLE_LABELS = {
@@ -21,6 +22,7 @@ const ROLE_LABELS = {
 const LEVEL_ORDER = ['L1', 'L2', 'L3', 'M1', 'M2', 'D1', 'D2', 'D3']
 
 function ReportCard({ icon: Icon, iconBg, iconColor, title, description, onGenerate, loading, delay = 0 }) {
+  const { t } = useI18n()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -45,13 +47,14 @@ function ReportCard({ icon: Icon, iconBg, iconColor, title, description, onGener
           ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           : <PrinterIcon className="w-4 h-4" />
         }
-        {loading ? 'Génération…' : 'Voir le rapport'}
+        {loading ? t('generating') : t('view_report')}
       </button>
     </motion.div>
   )
 }
 
 export default function RegistrarReports() {
+  const { t } = useI18n()
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingLevels, setLoadingLevels] = useState(false)
   const [loadingDepts, setLoadingDepts] = useState(false)
@@ -60,51 +63,49 @@ export default function RegistrarReports() {
   const handleUsers = async () => {
     setLoadingUsers(true)
     try {
-      const results = await Promise.all(ROLES.map(r => registrarApi.getUsers(r)))
-      const byRole = {}
-      ROLES.forEach((r, i) => {
-        byRole[r] = results[i].data?.data?.data || results[i].data?.data || []
-      })
+      await openReportAsyncSafe(t('registrar_report_users_title'), async () => {
+        const results = await Promise.all(ROLES.map(r => registrarApi.getUsers(r)))
+        const byRole = {}
+        ROLES.forEach((r, i) => {
+          byRole[r] = results[i].data?.data?.data || results[i].data?.data || []
+        })
 
-      const sections = ROLES.map(role => {
-        const users = byRole[role]
-        if (!users.length) return ''
-        const rows = users.map(u => {
-          const user = role === 'teacher' ? (u.user || u) : (role === 'student' ? (u.user || u) : u)
-          const fn = esc(u.user?.first_name || u.first_name || '')
-          const ln = esc(u.user?.last_name || u.last_name || '')
-          const email = esc(u.user?.email || u.email || '—')
-          const empId = esc(u.employee_id || u.student_id || u.user?.employee_id || '—')
-          const status = (u.user?.status ?? u.status) === 'inactive' ? 'Inactif' : 'Actif'
-          const stCls = status === 'Actif' ? 'g' : 'r'
-          return `<tr>
+        const sections = ROLES.map(role => {
+          const users = byRole[role]
+          if (!users.length) return ''
+          const rows = users.map(u => {
+            const fn = esc(u.user?.first_name || u.first_name || '')
+            const ln = esc(u.user?.last_name || u.last_name || '')
+            const username = esc(u.user?.username || u.username || '—')
+            const email = esc(u.user?.email || u.email || '—')
+            const empId = esc(u.employee_id || u.student_id || u.user?.employee_id || '—')
+            const rawStatus = u.user?.status ?? u.status ?? ''
+            const stLbl = rawStatus === 'inactive' ? 'Inactif' : rawStatus === 'on_leave' ? 'En congé' : rawStatus === 'suspended' ? 'Suspendu' : rawStatus === 'graduated' ? 'Diplômé' : 'Actif'
+            return `<tr>
             <td><strong>${fn} ${ln}</strong></td>
+            <td style="font-family:monospace;font-size:10px">${username}</td>
             <td>${email}</td>
             <td style="font-family:monospace;font-size:10px">${empId}</td>
-            <td style="text-align:center"><span class="badge ${stCls}">${status}</span></td>
+            <td style="text-align:center"><span class="badge">${stLbl}</span></td>
           </tr>`
-        }).join('')
-        return `<div class="level-title" style="color:#6d28d9;background:#f5f3ff;border-left-color:#7c3aed">
-            ${ROLE_LABELS[role]} (${users.length})
-          </div>
-          <table><thead><tr><th>Nom Complet</th><th>Email</th><th>ID</th><th style="text-align:center">Statut</th></tr></thead>
+          }).join('')
+          return `<div class="level-title">${ROLE_LABELS[role]} (${users.length})</div>
+          <table><thead><tr><th>Nom Complet</th><th>Nom d'utilisateur</th><th>Email</th><th>ID</th><th style="text-align:center">Statut</th></tr></thead>
           <tbody>${rows}</tbody></table>`
-      }).join('')
+        }).join('')
 
-      const total = ROLES.reduce((s, r) => s + byRole[r].length, 0)
-      const summary = ROLES.map(r => `${ROLE_LABELS[r]}: <strong>${byRole[r].length}</strong>`).join(' &nbsp;·&nbsp; ')
+        const total = ROLES.reduce((s, r) => s + byRole[r].length, 0)
+        const summary = ROLES.map(r => `${ROLE_LABELS[r]}: <strong>${byRole[r].length}</strong>`).join(' &nbsp;·&nbsp; ')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#374151">
+        const body = `
+        <div class="info-box">
           Total utilisateurs : <strong>${total}</strong> &nbsp;—&nbsp; ${summary}
         </div>
         ${sections}`
-
-      if (!openReport('Rapport des Utilisateurs', 'Liste Complète des Utilisateurs par Rôle', body)) {
-        toast.error('Autorisez les pop-ups pour afficher le rapport')
-      }
+        return { subtitle: t('registrar_report_users_subtitle'), body }
+      })
     } catch {
-      toast.error('Erreur lors de la génération du rapport utilisateurs')
+      toast.error(t('error'))
     } finally {
       setLoadingUsers(false)
     }
@@ -114,60 +115,60 @@ export default function RegistrarReports() {
   const handleLevels = async () => {
     setLoadingLevels(true)
     try {
-      const res = await studentApi.getAll({ per_page: 2000 })
-      const students = res.data?.data?.data || res.data?.data || []
+      await openReportAsyncSafe(t('registrar_report_students_by_level_title'), async () => {
+        const res = await studentApi.getAll({ per_page: 2000 })
+        const students = res.data?.data?.data || res.data?.data || []
 
-      // Group by level
-      const grouped = {}
-      students.forEach(s => {
-        const lvl = s.level || 'Inconnu'
-        if (!grouped[lvl]) grouped[lvl] = []
-        grouped[lvl].push(s)
-      })
+        const grouped = {}
+        students.forEach(s => {
+          const lvl = s.level || 'Inconnu'
+          if (!grouped[lvl]) grouped[lvl] = []
+          grouped[lvl].push(s)
+        })
 
-      const sortedLevels = Object.keys(grouped).sort((a, b) => {
-        const ia = LEVEL_ORDER.indexOf(a), ib = LEVEL_ORDER.indexOf(b)
-        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
-      })
+        const sortedLevels = Object.keys(grouped).sort((a, b) => {
+          const ia = LEVEL_ORDER.indexOf(a), ib = LEVEL_ORDER.indexOf(b)
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+        })
 
-      const sections = sortedLevels.map(lvl => {
-        const list = grouped[lvl]
-        const rows = list.map(s => {
-          const fn = esc(s.user?.first_name || '')
-          const ln = esc(s.user?.last_name || '')
-          const enrolDate = s.enrollment_date
-            ? new Date(s.enrollment_date).toLocaleDateString('fr-FR')
-            : '—'
-          const stCls = s.status === 'active' ? 'g' : s.status === 'graduated' ? 'b' : 'r'
-          const stLbl = s.status === 'active' ? 'Actif' : s.status === 'graduated' ? 'Diplômé' : esc(s.status || 'Inconnu')
-          return `<tr>
+        const sections = sortedLevels.map(lvl => {
+          const list = grouped[lvl]
+          const rows = list.map(s => {
+            const fn = esc(s.user?.first_name || '')
+            const ln = esc(s.user?.last_name || '')
+            const username = esc(s.user?.username || '—')
+            const enrolDate = s.enrollment_date
+              ? new Date(s.enrollment_date).toLocaleDateString('fr-FR')
+              : '—'
+            const rawStatus = s.status ?? ''
+            const stLbl = rawStatus === 'inactive' ? 'Inactif' : rawStatus === 'graduated' ? 'Diplômé' : rawStatus === 'suspended' ? 'Suspendu' : rawStatus === 'on_leave' ? 'En congé' : rawStatus === 'transfer' ? 'Transféré' : 'Actif'
+            return `<tr>
             <td style="font-family:monospace;font-size:10px">${esc(s.student_id || '—')}</td>
             <td><strong>${fn} ${ln}</strong></td>
+            <td style="font-family:monospace;font-size:10px">${username}</td>
             <td>${esc(s.department?.name || '—')}</td>
             <td>${esc(s.department?.faculty?.name || '—')}</td>
             <td>${enrolDate}</td>
-            <td style="text-align:center"><span class="badge ${stCls}">${stLbl}</span></td>
+            <td style="text-align:center"><span class="badge">${stLbl}</span></td>
           </tr>`
-        }).join('')
-        return `<div class="level-title">${esc(lvl)} — ${list.length} étudiant${list.length > 1 ? 's' : ''}</div>
+          }).join('')
+          return `<div class="level-title">${esc(lvl)} — ${list.length} étudiant${list.length > 1 ? 's' : ''}</div>
           <table><thead><tr>
-            <th>Matricule</th><th>Nom Complet</th><th>Département</th><th>Faculté</th><th>Inscription</th>
+            <th>Matricule</th><th>Nom Complet</th><th>Nom d'utilisateur</th><th>Département</th><th>Faculté</th><th>Inscription</th>
             <th style="text-align:center">Statut</th>
           </tr></thead><tbody>${rows}</tbody></table>`
-      }).join('')
+        }).join('')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px">
+        const body = `
+        <div class="info-box">
           Total : <strong>${students.length} étudiant${students.length > 1 ? 's' : ''}</strong> &nbsp;·&nbsp;
           ${sortedLevels.map(l => `${l}: ${grouped[l].length}`).join(' &nbsp;·&nbsp; ')}
         </div>
         ${sections}`
-
-      if (!openReport('Étudiants par Niveau', 'Liste des Étudiants Organisée par Niveau Académique', body)) {
-        toast.error('Autorisez les pop-ups pour afficher le rapport')
-      }
+        return { subtitle: t('registrar_report_students_by_level_subtitle'), body }
+      })
     } catch {
-      toast.error('Erreur lors de la génération du rapport')
+      toast.error(t('error'))
     } finally {
       setLoadingLevels(false)
     }
@@ -177,55 +178,55 @@ export default function RegistrarReports() {
   const handleDepts = async () => {
     setLoadingDepts(true)
     try {
-      const res = await teacherApi.getAll({ per_page: 1000 })
-      const teachers = res.data?.data?.data || res.data?.data || []
+      await openReportAsyncSafe(t('registrar_report_teachers_by_department_title'), async () => {
+        const res = await teacherApi.getAll({ per_page: 1000 })
+        const teachers = res.data?.data?.data || res.data?.data || []
 
-      // Group by faculty → department
-      const byFaculty = {}
-      teachers.forEach(t => {
-        const fac = t.department?.faculty?.name || 'Sans Faculté'
-        const dept = t.department?.name || 'Sans Département'
-        if (!byFaculty[fac]) byFaculty[fac] = {}
-        if (!byFaculty[fac][dept]) byFaculty[fac][dept] = []
-        byFaculty[fac][dept].push(t)
-      })
+        const byFaculty = {}
+        teachers.forEach(t => {
+          const fac = t.department?.faculty?.name || 'Sans Faculté'
+          const dept = t.department?.name || 'Sans Département'
+          if (!byFaculty[fac]) byFaculty[fac] = {}
+          if (!byFaculty[fac][dept]) byFaculty[fac][dept] = []
+          byFaculty[fac][dept].push(t)
+        })
 
-      const sections = Object.entries(byFaculty).sort(([a], [b]) => a.localeCompare(b)).map(([fac, depts]) => {
-        const facTotal = Object.values(depts).reduce((s, arr) => s + arr.length, 0)
-        const deptSections = Object.entries(depts).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
-          const rows = list.map(t => {
-            const fn = esc(t.user?.first_name || '')
-            const ln = esc(t.user?.last_name || '')
-            const email = esc(t.user?.email || '—')
-            const empId = esc(t.employee_id || '—')
-            const stCls = (t.user?.status ?? t.status) === 'inactive' ? 'r' : 'g'
-            const stLbl = (t.user?.status ?? t.status) === 'inactive' ? 'Inactif' : 'Actif'
-            return `<tr>
+        const sections = Object.entries(byFaculty).sort(([a], [b]) => a.localeCompare(b)).map(([fac, depts]) => {
+          const facTotal = Object.values(depts).reduce((s, arr) => s + arr.length, 0)
+          const deptSections = Object.entries(depts).sort(([a], [b]) => a.localeCompare(b)).map(([dept, list]) => {
+            const rows = list.map(t => {
+              const fn = esc(t.user?.first_name || '')
+              const ln = esc(t.user?.last_name || '')
+              const username = esc(t.user?.username || '—')
+              const email = esc(t.user?.email || '—')
+              const empId = esc(t.employee_id || '—')
+              const rawStatus = t.user?.status ?? t.status ?? ''
+              const stLbl = rawStatus === 'inactive' ? 'Inactif' : rawStatus === 'on_leave' ? 'En congé' : rawStatus === 'suspended' ? 'Suspendu' : 'Actif'
+              return `<tr>
               <td style="font-family:monospace;font-size:10px">${empId}</td>
               <td><strong>${fn} ${ln}</strong></td>
+              <td style="font-family:monospace;font-size:10px">${username}</td>
               <td>${email}</td>
-              <td style="text-align:center"><span class="badge ${stCls}">${stLbl}</span></td>
+              <td style="text-align:center"><span class="badge">${stLbl}</span></td>
             </tr>`
-          }).join('')
-          return `<div class="dept-title">${esc(dept)} (${list.length})</div>
-            <table><thead><tr><th>ID Employé</th><th>Nom Complet</th><th>Email</th><th style="text-align:center">Statut</th></tr></thead>
+            }).join('')
+            return `<div class="dept-title">${esc(dept)} (${list.length})</div>
+            <table><thead><tr><th>ID Employé</th><th>Nom Complet</th><th>Nom d'utilisateur</th><th>Email</th><th style="text-align:center">Statut</th></tr></thead>
             <tbody>${rows}</tbody></table>`
+          }).join('')
+          return `<div class="faculty-title">${esc(fac)} — ${facTotal} enseignant${facTotal > 1 ? 's' : ''}</div>${deptSections}`
         }).join('')
-        return `<div class="faculty-title">${esc(fac)} — ${facTotal} enseignant${facTotal > 1 ? 's' : ''}</div>${deptSections}`
-      }).join('')
 
-      const body = `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px">
+        const body = `
+        <div class="info-box">
           Total : <strong>${teachers.length} enseignant${teachers.length > 1 ? 's' : ''}</strong> dans
           <strong>${Object.keys(byFaculty).length} faculté${Object.keys(byFaculty).length > 1 ? 's' : ''}</strong>
         </div>
         ${sections}`
-
-      if (!openReport('Enseignants par Département', 'Liste des Enseignants par Faculté et Département', body)) {
-        toast.error('Autorisez les pop-ups pour afficher le rapport')
-      }
+        return { subtitle: t('registrar_report_teachers_by_department_subtitle'), body }
+      })
     } catch {
-      toast.error('Erreur lors de la génération du rapport')
+      toast.error(t('error'))
     } finally {
       setLoadingDepts(false)
     }

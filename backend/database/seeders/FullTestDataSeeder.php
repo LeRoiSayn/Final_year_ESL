@@ -14,6 +14,7 @@ use App\Models\Grade;
 use App\Models\Schedule;
 use App\Models\FeeType;
 use App\Models\StudentFee;
+use App\Models\Notification;
 use App\Models\Payment;
 use Carbon\Carbon;
 
@@ -34,6 +35,12 @@ class FullTestDataSeeder extends Seeder
 
         $this->command->info('→ Creating fees & payment scenarios...');
         $this->seedFinance();
+
+        $this->command->info('→ Creating historical fees for L2/L3 students...');
+        $this->seedHistoricalFinance();
+
+        $this->command->info('→ Simulating grade submissions for complete classes...');
+        $this->seedGradeSubmissions();
 
         $this->command->info('✓ Full test data seeded.');
     }
@@ -408,11 +415,79 @@ class FullTestDataSeeder extends Seeder
         Payment::withoutEvents(fn () => Payment::create($data));
     }
 
-    private function createFeeWithPayment(Student $student, FeeType $feeType, string $scenario, string $context): void
+    // ──────────────────────────────────────────────────────────────────────────
+    // 4b. HISTORICAL FINANCE (L2/L3 prior academic years)
+    // ──────────────────────────────────────────────────────────────────────────
+    private function seedHistoricalFinance(): void
+    {
+        $regFee = FeeType::where('category', 'registration')->first();
+        $labFee = FeeType::where('name', 'Frais de laboratoire')->first();
+        $libFee = FeeType::where('name', 'Frais de bibliothèque')->first();
+        $l1Fee  = FeeType::where('name', 'Scolarité L1')->first();
+        $l2Fee  = FeeType::where('name', 'Scolarité L2')->first();
+
+        $students = Student::with('user')->get()->keyBy(fn($s) => $s->user->username ?? '');
+
+        // ── L2 STUDENTS — need L1 year (2024-2025) ───────────────────────────
+        $l2Students = [
+            // Danielle: tout payé depuis la 1ère année
+            'danielle1' => ['l1_scenario' => 'fully_paid'],
+            // Joris: plan versements L1, partiellement réglé
+            'joris1'    => ['l1_scenario' => 'installment_6_partial_hist'],
+            // Exauc: difficultés paiement en L1 (n'a pas tout payé)
+            'exauc1'    => ['l1_scenario' => 'partial_payment'],
+        ];
+
+        foreach ($l2Students as $username => $cfg) {
+            $student = $students[$username] ?? null;
+            if (!$student) continue;
+
+            $y1 = '2024-2025';
+            $d1 = Carbon::parse('2024-09-15');
+
+            if ($regFee) $this->createFeeWithPayment($student, $regFee, $cfg['l1_scenario'], 'registration', $y1, $d1);
+            if ($l1Fee)  $this->createFeeWithPayment($student, $l1Fee, $cfg['l1_scenario'], 'tuition', $y1, $d1);
+            if ($libFee) $this->createFeeWithPayment($student, $libFee, $cfg['l1_scenario'] === 'fully_paid' ? 'fully_paid' : 'unpaid', 'lib', $y1, $d1);
+        }
+
+        // ── L3 STUDENTS — need L1 (2023-2024) and L2 (2024-2025) years ──────
+        $l3Students = [
+            // Melissa: excellente étudiante, tout payé depuis L1
+            'melissa1'    => ['l1_scenario' => 'fully_paid',    'l2_scenario' => 'fully_paid'],
+            // Christophe: régulier, tout payé
+            'christophe1' => ['l1_scenario' => 'fully_paid',    'l2_scenario' => 'installment_3_complete_hist'],
+            // Grce: L1 tout payé, L2 avec des difficultés (partiel)
+            'grce1'       => ['l1_scenario' => 'fully_paid',    'l2_scenario' => 'partial_payment'],
+        ];
+
+        foreach ($l3Students as $username => $cfg) {
+            $student = $students[$username] ?? null;
+            if (!$student) continue;
+
+            // L1 — année 2023-2024
+            $y1 = '2023-2024';
+            $d1 = Carbon::parse('2023-09-15');
+
+            if ($regFee) $this->createFeeWithPayment($student, $regFee, $cfg['l1_scenario'], 'registration', $y1, $d1);
+            if ($l1Fee)  $this->createFeeWithPayment($student, $l1Fee, $cfg['l1_scenario'], 'tuition', $y1, $d1);
+            if ($libFee) $this->createFeeWithPayment($student, $libFee, $cfg['l1_scenario'] === 'fully_paid' ? 'fully_paid' : 'unpaid', 'lib', $y1, $d1);
+
+            // L2 — année 2024-2025
+            $y2 = '2024-2025';
+            $d2 = Carbon::parse('2024-09-15');
+
+            if ($regFee) $this->createFeeWithPayment($student, $regFee, $cfg['l2_scenario'], 'registration', $y2, $d2);
+            if ($l2Fee)  $this->createFeeWithPayment($student, $l2Fee, $cfg['l2_scenario'], 'tuition', $y2, $d2);
+            if ($labFee) $this->createFeeWithPayment($student, $labFee, 'fully_paid', 'lab', $y2, $d2);
+            if ($libFee) $this->createFeeWithPayment($student, $libFee, in_array($cfg['l2_scenario'], ['fully_paid','installment_3_complete_hist']) ? 'fully_paid' : 'unpaid', 'lib', $y2, $d2);
+        }
+    }
+
+    private function createFeeWithPayment(Student $student, FeeType $feeType, string $scenario, string $context, ?string $forYear = null, ?Carbon $forBaseDate = null): void
     {
         $amount   = (float) $feeType->amount;
-        $year     = $this->academicYear;
-        $baseDate = Carbon::parse('2025-09-15');
+        $year     = $forYear ?? $this->academicYear;
+        $baseDate = $forBaseDate ? $forBaseDate->copy() : Carbon::parse('2025-09-15');
 
         // Skip if already exists
         if (StudentFee::where('student_id', $student->id)->where('fee_type_id', $feeType->id)->where('academic_year', $year)->exists()) return;
@@ -516,6 +591,52 @@ class FullTestDataSeeder extends Seeder
                 ]);
                 break;
 
+            // Historical variant: installment 6 months, all settled (used for past years)
+            case 'installment_6_partial_hist':
+                $monthly = round($amount / 6, 2);
+                $paidMonths = rand(3, 5); // mostly paid but not complete
+                $paidAmount = round($monthly * $paidMonths, 2);
+                $plan = $this->buildInstallmentPlan($amount, 6, $baseDate, false, $paidMonths);
+                $fee = StudentFee::create([
+                    'student_id'      => $student->id, 'fee_type_id' => $feeType->id,
+                    'amount'          => $amount,       'paid_amount' => $paidAmount,
+                    'due_date'        => $baseDate,     'status'      => 'partial',
+                    'academic_year'   => $year,         'installment_plan' => $plan,
+                ]);
+                for ($m = 0; $m < $paidMonths; $m++) {
+                    $this->insertPayment([
+                        'student_fee_id'   => $fee->id,
+                        'amount'           => $monthly,
+                        'payment_method'   => 'cash',
+                        'reference_number' => 'HIST6-' . $student->id . '-' . $feeType->id . '-' . $year . '-' . ($m + 1),
+                        'payment_date'     => $baseDate->copy()->addMonths($m),
+                        'notes'            => 'Tranche ' . ($m + 1) . '/6 — ' . $year,
+                    ]);
+                }
+                break;
+
+            // Historical variant: installment 3 months complete (used for past years)
+            case 'installment_3_complete_hist':
+                $monthly = round($amount / 3, 2);
+                $plan = $this->buildInstallmentPlan($amount, 3, $baseDate, true);
+                $fee = StudentFee::create([
+                    'student_id'      => $student->id, 'fee_type_id' => $feeType->id,
+                    'amount'          => $amount,       'paid_amount' => $amount,
+                    'due_date'        => $baseDate,     'status'      => 'paid',
+                    'academic_year'   => $year,         'installment_plan' => $plan,
+                ]);
+                for ($m = 0; $m < 3; $m++) {
+                    $this->insertPayment([
+                        'student_fee_id'   => $fee->id,
+                        'amount'           => $m === 2 ? $amount - ($monthly * 2) : $monthly,
+                        'payment_method'   => 'mobile_money',
+                        'reference_number' => 'HIST3-' . $student->id . '-' . $feeType->id . '-' . $year . '-' . ($m + 1),
+                        'payment_date'     => $baseDate->copy()->addMonths($m),
+                        'notes'            => 'Tranche ' . ($m + 1) . '/3 — ' . $year,
+                    ]);
+                }
+                break;
+
             case 'unpaid':
             default:
                 StudentFee::create([
@@ -542,5 +663,86 @@ class FullTestDataSeeder extends Seeder
             ];
         }
         return ['months' => $months, 'monthly_amount' => $monthly, 'tranches' => $tranches];
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 6. GRADE SUBMISSIONS (simulate teacher submit for fully-graded classes)
+    // ──────────────────────────────────────────────────────────────────────────
+    /**
+     * For every active class where ALL enrolled students have a grade record,
+     * create a grades_submitted notification so the admin can see them as
+     * "Soumis" and validate them.  Classes with missing grades stay "En attente".
+     */
+    private function seedGradeSubmissions(): void
+    {
+        $adminUser = User::where('role', 'admin')->first();
+        $adminId   = $adminUser?->id ?? 1;
+
+        $classes = ClassModel::with(['course', 'teacher.user'])
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($classes as $class) {
+            $totalEnrolled = Enrollment::where('class_id', $class->id)
+                ->where('status', 'enrolled')
+                ->count();
+
+            if ($totalEnrolled === 0) continue;
+
+            $graded = Grade::whereHas(
+                'enrollment',
+                fn($q) => $q->where('class_id', $class->id)
+            )->count();
+
+            // Only submit if ALL enrolled students have a grade
+            if ($graded < $totalEnrolled) continue;
+
+            // Skip if a submission notification already exists for this class
+            $alreadySubmitted = Notification::where('type', 'grades_submitted')
+                ->whereJsonContains('data->class_id', $class->id)
+                ->exists();
+
+            if ($alreadySubmitted) continue;
+
+            $courseName = $class->course?->name ?? ('Cours ' . $class->id);
+            $teacherId  = $class->teacher?->user?->id ?? $adminId;
+            $submittedAt = Carbon::now()->subWeeks(2);
+
+            // Notification to admin
+            Notification::create([
+                'user_id'    => $adminId,
+                'type'       => 'grades_submitted',
+                'title'      => 'Notes soumises',
+                'message'    => "Les notes de {$courseName} ont été soumises et sont en attente de validation.",
+                'link'       => '/admin/grades',
+                'read_at'    => null,
+                'created_at' => $submittedAt,
+                'updated_at' => $submittedAt,
+                'data'       => [
+                    'class_id'    => $class->id,
+                    'course_name' => $courseName,
+                    'submitted_by'=> $teacherId,
+                ],
+            ]);
+
+            // Notification to teacher (for their notification feed)
+            if ($teacherId !== $adminId) {
+                Notification::create([
+                    'user_id'    => $teacherId,
+                    'type'       => 'grades_submitted',
+                    'title'      => 'Notes soumises',
+                    'message'    => "Vous avez soumis les notes de {$courseName} à l'administration.",
+                    'link'       => '/teacher/grades',
+                    'read_at'    => $submittedAt, // already read by teacher
+                    'created_at' => $submittedAt,
+                    'updated_at' => $submittedAt,
+                    'data'       => [
+                        'class_id'    => $class->id,
+                        'course_name' => $courseName,
+                        'submitted_by'=> $teacherId,
+                    ],
+                ]);
+            }
+        }
     }
 }

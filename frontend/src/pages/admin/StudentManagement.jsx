@@ -17,8 +17,11 @@ import {
   ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import api, { courseApi } from "../../services/api";
+import { openReportAsyncSafe, esc as escReport } from "../../utils/reportPrint";
+import { useI18n } from "../../i18n/index.jsx";
 
 const StudentManagement = () => {
+  const { t } = useI18n();
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,277 +93,137 @@ const StudentManagement = () => {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
 
-  const generateAcademicReportHtml = (
-    student,
-    courses,
-    uniName = "ESL University",
-    logoPath = "/logo.png",
-  ) => {
+  const generateAcademicReportBody = (student, courses) => {
     const fullName = `${escHtml(student.student.user?.first_name)} ${escHtml(student.student.user?.last_name)}`.trim();
-    const studentInfo = `
-      <tr><td><strong>Nom</strong></td><td>${fullName}</td></tr>
-      <tr><td><strong>Email</strong></td><td>${escHtml(student.student.user?.email)}</td></tr>
-      <tr><td><strong>Numéro</strong></td><td>${escHtml(student.student.student_id)}</td></tr>
-      <tr><td><strong>Département</strong></td><td>${escHtml(student.student.department?.name)}</td></tr>
-      <tr><td><strong>Niveau</strong></td><td>${escHtml(student.student.level)}</td></tr>
-    `;
 
-    // Map grades by course id
     const gradesMap = (student.student.grades || []).reduce((acc, g) => {
       const id = g.course_id || (g.course && g.course.id)
       if (id) acc[id] = g
       return acc
     }, {})
-
     const enrolledIds = new Set((student.student.enrollments || []).map((e) => e.course_id))
 
-    const coursesRows = courses
-      .map((c) => {
-        const g = gradesMap[c.id] || null
-        const gradeCell = g ? `${escHtml(g.final_grade)}/100 (${escHtml(g.letter_grade)})` : "—"
-        const semester = escHtml(g?.semester)
-        const status = enrolledIds.has(c.id) ? "Inscrit" : "Non inscrit"
-        return `
-      <tr>
-        <td>${escHtml(c.code)}</td>
-        <td>${escHtml(c.name)}</td>
-        <td>${escHtml(c.level)}</td>
-        <td>${escHtml(c.credits)}</td>
-        <td>${semester}</td>
-        <td>${gradeCell}</td>
-        <td>${status}</td>
-      </tr>
-    `
-      })
-      .join("\n");
+    const coursesRows = courses.map((c) => {
+      const g = gradesMap[c.id] || null
+      const gradeCell = g ? `${escHtml(g.final_grade)}/100 (${escHtml(g.letter_grade)})` : "—"
+      const status = enrolledIds.has(c.id) ? "Inscrit" : "Non inscrit"
+      return `<tr>
+        <td>${escHtml(c.code)}</td><td>${escHtml(c.name)}</td>
+        <td>${escHtml(c.level)}</td><td>${escHtml(c.credits)}</td>
+        <td>${escHtml(g?.semester)}</td><td>${gradeCell}</td><td>${status}</td>
+      </tr>`
+    }).join("")
 
     return `
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Rapport académique - ${escHtml(fullName)}</title>
-        <style>
-          body{font-family:Helvetica, Arial, sans-serif;padding:24px;color:#111}
-          .header{display:flex;align-items:center;gap:16px}
-          .logo{width:72px;height:72px;object-fit:contain}
-          h1{margin:0;font-size:20px}
-          table{width:100%;border-collapse:collapse;margin-top:16px}
-          table, th, td{border:1px solid #ddd}
-          th, td{padding:8px;text-align:left}
-          .print{position:fixed;right:20px;top:20px}
-          @media print{ .print{display:none} }
-        </style>
-      </head>
-      <body>
-        <button class="print" onclick="window.print()">Imprimer</button>
-        <div class="header">
-          <img src="${logoPath}" class="logo" alt="logo" onerror="this.style.display='none'" />
-          <div>
-            <h1>${uniName}</h1>
-            <div>Rapport académique</div>
-          </div>
-        </div>
-
-        <h2>Étudiant</h2>
-        <table>
-          ${studentInfo}
-        </table>
-
-        <h2 style="margin-top:20px">Cours de la filière (${courses.length})</h2>
-        <table>
-          <thead>
-            <tr><th>Code</th><th>Nom</th><th>Niveau</th><th>Crédits</th><th>Semestre</th><th>Note</th><th>Statut</th></tr>
-          </thead>
-          <tbody>
-            ${coursesRows}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
+      <div class="info-box">
+        <strong>Nom :</strong> ${fullName} &nbsp;|&nbsp;
+        <strong>Email :</strong> ${escHtml(student.student.user?.email)} &nbsp;|&nbsp;
+        <strong>Matricule :</strong> ${escHtml(student.student.student_id)} &nbsp;|&nbsp;
+        <strong>Département :</strong> ${escHtml(student.student.department?.name)} &nbsp;|&nbsp;
+        <strong>Niveau :</strong> ${escHtml(student.student.level)}
+      </div>
+      <div class="section-title">Cours de la filière (${courses.length})</div>
+      <table>
+        <thead><tr>
+          <th>Code</th><th>Nom</th><th>Niveau</th><th>Crédits</th>
+          <th>Semestre</th><th>Note</th><th>Statut</th>
+        </tr></thead>
+        <tbody>${coursesRows || '<tr><td colspan="7" style="text-align:center;color:#999">Aucun cours trouvé</td></tr>'}</tbody>
+      </table>`
   };
 
-  const generateFinancialReportHtml = (
-    student,
-    payments = [],
-    uniName = "ESL University",
-    logoPath = "/logo.png",
-  ) => {
+  const generateFinancialReportBody = (student, payments = []) => {
     const fullName = `${escHtml(student.student.user?.first_name)} ${escHtml(student.student.user?.last_name)}`.trim();
 
-    // Group fees by academic year
     const fees = student.student?.fees || []
     const byYear = {}
     fees.forEach((f) => {
-      const year = f.academic_year || f.year || (f.created_at ? new Date(f.created_at).getFullYear() : "Unknown")
-      if (!byYear[year]) byYear[year] = { fees: [], totalDue: 0, payments: 0 }
-      byYear[year].fees.push(f)
-      const amount = f.amount || f.total || f.fee_amount || 0
-      byYear[year].totalDue += amount
-      if (f.payments && f.payments.length) {
-        f.payments.forEach((p) => {
-          const paid = p.amount || p.total || 0
-          byYear[year].payments += paid
-        })
-      }
+      const year = f.academic_year || f.year || (f.created_at ? new Date(f.created_at).getFullYear() : "Inconnu")
+      if (!byYear[year]) byYear[year] = { totalDue: 0, payments: 0 }
+      byYear[year].totalDue += f.amount || f.total || f.fee_amount || 0
+      if (f.payments) f.payments.forEach((p) => { byYear[year].payments += p.amount || p.total || 0 })
     })
-
-    // include standalone payments
     payments.forEach((p) => {
-      const year = p.academic_year || (p.created_at ? new Date(p.created_at).getFullYear() : "Unknown")
-      if (!byYear[year]) byYear[year] = { fees: [], totalDue: 0, payments: 0 }
-      const paid = p.amount || p.total || 0
-      byYear[year].payments += paid
+      const year = p.academic_year || (p.created_at ? new Date(p.created_at).getFullYear() : "Inconnu")
+      if (!byYear[year]) byYear[year] = { totalDue: 0, payments: 0 }
+      byYear[year].payments += p.amount || p.total || 0
     })
 
-    const years = Object.keys(byYear).sort()
+    const yearsRows = Object.keys(byYear).sort().map((y) => {
+      const e = byYear[y]
+      return `<tr>
+        <td>${escHtml(y)}</td>
+        <td>${(e.totalDue || 0).toLocaleString()} FCFA</td>
+        <td>${(e.payments || 0).toLocaleString()} FCFA</td>
+        <td>${((e.totalDue || 0) - (e.payments || 0)).toLocaleString()} FCFA</td>
+      </tr>`
+    }).join("")
 
-    const yearsRows = years
-      .map((y) => {
-        const entry = byYear[y]
-        const balance = (entry.totalDue || 0) - (entry.payments || 0)
-        return `
-        <tr>
-          <td>${escHtml(y)}</td>
-          <td>${(entry.totalDue || 0).toLocaleString()}</td>
-          <td>${(entry.payments || 0).toLocaleString()}</td>
-          <td>${balance.toLocaleString()}</td>
-        </tr>
-      `
-      })
-      .join("\n")
-
-    const paymentsRows = payments
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .map(
-        (p) => `
-      <tr>
-        <td>${escHtml(new Date(p.created_at).toLocaleDateString())}</td>
-        <td>${escHtml(p.academic_year)}</td>
-        <td>${escHtml(p.payment_method || p.method)}</td>
-        <td>${(p.amount || p.total || 0).toLocaleString()}</td>
-        <td>${escHtml(p.reference || p.txn_id)}</td>
-      </tr>
-    `,
-      )
-      .join("\n")
+    const paymentsRows = [...payments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((p) => `<tr>
+      <td>${escHtml(new Date(p.created_at).toLocaleDateString('fr-FR'))}</td>
+      <td>${escHtml(p.academic_year)}</td>
+      <td>${escHtml(p.payment_method || p.method)}</td>
+      <td>${(p.amount || p.total || 0).toLocaleString()} FCFA</td>
+      <td>${escHtml(p.reference || p.txn_id)}</td>
+    </tr>`).join("")
 
     const overallBalance = student.statistics?.financial?.remaining ?? student.student?.financial_balance ?? 0
 
     return `
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Rapport financier - ${escHtml(fullName)}</title>
-        <style>
-          body{font-family:Helvetica, Arial, sans-serif;padding:24px;color:#111}
-          .header{display:flex;align-items:center;gap:16px}
-          .logo{width:72px;height:72px;object-fit:contain}
-          h1{margin:0;font-size:20px}
-          table{width:100%;border-collapse:collapse;margin-top:16px}
-          table, th, td{border:1px solid #ddd}
-          th, td{padding:8px;text-align:left}
-          .print{position:fixed;right:20px;top:20px}
-          @media print{ .print{display:none} }
-        </style>
-      </head>
-      <body>
-        <button class="print" onclick="window.print()">Imprimer</button>
-        <div class="header">
-          <img src="${logoPath}" class="logo" alt="logo" onerror="this.style.display='none'" />
-          <div>
-            <h1>${uniName}</h1>
-            <div>Rapport financier</div>
-          </div>
-        </div>
-
-        <h2>Étudiant</h2>
-        <table>
-          <tr><td><strong>Nom</strong></td><td>${fullName}</td></tr>
-          <tr><td><strong>Email</strong></td><td>${escHtml(student.student.user?.email)}</td></tr>
-          <tr><td><strong>Numéro</strong></td><td>${escHtml(student.student.student_id)}</td></tr>
-          <tr><td><strong>Solde global</strong></td><td>${overallBalance.toLocaleString()} F</td></tr>
-        </table>
-
-        <h2 style="margin-top:20px">Bilan par année académique</h2>
-        <table>
-          <thead>
-            <tr><th>Année</th><th>Total dû</th><th>Total payé</th><th>Solde</th></tr>
-          </thead>
-          <tbody>
-            ${yearsRows || '<tr><td colspan="4">Aucun frais trouvé</td></tr>'}
-          </tbody>
-        </table>
-
-        <h2 style="margin-top:20px">Historique des paiements</h2>
-        <table>
-          <thead>
-            <tr><th>Date</th><th>Année</th><th>Méthode</th><th>Montant</th><th>Référence</th></tr>
-          </thead>
-          <tbody>
-            ${paymentsRows || '<tr><td colspan="5">Aucun paiement trouvé</td></tr>'}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
+      <div class="info-box">
+        <strong>Nom :</strong> ${fullName} &nbsp;|&nbsp;
+        <strong>Email :</strong> ${escHtml(student.student.user?.email)} &nbsp;|&nbsp;
+        <strong>Matricule :</strong> ${escHtml(student.student.student_id)} &nbsp;|&nbsp;
+        <strong>Solde global :</strong> ${overallBalance.toLocaleString()} FCFA
+      </div>
+      <div class="section-title">Bilan par année académique</div>
+      <table>
+        <thead><tr><th>Année</th><th>Total dû</th><th>Total payé</th><th>Solde</th></tr></thead>
+        <tbody>${yearsRows || '<tr><td colspan="4" style="text-align:center;color:#999">Aucun frais trouvé</td></tr>'}</tbody>
+      </table>
+      <div class="section-title">Historique des paiements</div>
+      <table>
+        <thead><tr><th>Date</th><th>Année</th><th>Méthode</th><th>Montant</th><th>Référence</th></tr></thead>
+        <tbody>${paymentsRows || '<tr><td colspan="5" style="text-align:center;color:#999">Aucun paiement trouvé</td></tr>'}</tbody>
+      </table>`
   };
 
   const openAcademicReport = async () => {
-    if (!selectedStudent) return alert("Sélectionnez un étudiant");
+    if (!selectedStudent) return alert(t("select_student"));
     try {
-      const deptId = selectedStudent.student.department?.id;
-      const res = await courseApi.getAll({
-        department_id: deptId,
-        per_page: 1000,
-      });
-      const data = res.data.data || res.data;
-      const courses = data.data || data || [];
-      const html = generateAcademicReportHtml(selectedStudent, courses);
-      const w = window.open("", "_blank");
-      if (!w)
-        return alert(
-          "Impossible d'ouvrir une nouvelle fenêtre. Vérifiez le bloqueur de popups.",
-        );
-      w.document.write(html);
-      w.document.close();
+      await openReportAsyncSafe(t("student_report_academic_title"), async () => {
+        const deptId = selectedStudent.student.department?.id;
+        const res = await courseApi.getAll({ department_id: deptId, per_page: 1000 });
+        const data = res.data.data || res.data;
+        const courses = data.data || data || [];
+        const fullName = `${selectedStudent.student.user?.first_name || ''} ${selectedStudent.student.user?.last_name || ''}`.trim();
+        const body = generateAcademicReportBody(selectedStudent, courses);
+        return { subtitle: `${t("student_report_academic_subtitle_prefix")} ${fullName}`, body };
+      })
       setShowReportDropdown(false);
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la génération du rapport");
+      alert(t("error"));
     }
   };
 
   const openFinancialReport = async () => {
-    if (!selectedStudent) return alert("Sélectionnez un étudiant");
+    if (!selectedStudent) return alert(t("select_student"));
     try {
-      // payments may be nested in selectedStudent.student.fees -> payments
-      const payments = [];
-      const fees = selectedStudent.student?.fees || selectedStudent.fees || [];
-      fees.forEach((f) => {
-        if (f.payments) {
-          f.payments.forEach((p) => payments.push(p));
-        }
-      });
-      // fallback: selectedStudent.payments
-      if ((selectedStudent.payments || []).length > 0) {
-        (selectedStudent.payments || []).forEach((p) => payments.push(p));
-      }
-
-      const html = generateFinancialReportHtml(selectedStudent, payments);
-      const w = window.open("", "_blank");
-      if (!w)
-        return alert(
-          "Impossible d'ouvrir une nouvelle fenêtre. Vérifiez le bloqueur de popups.",
-        );
-      w.document.write(html);
-      w.document.close();
+      await openReportAsyncSafe(t("student_report_financial_title"), async () => {
+        const payments = [];
+        const fees = selectedStudent.student?.fees || selectedStudent.fees || [];
+        fees.forEach((f) => { if (f.payments) f.payments.forEach((p) => payments.push(p)) });
+        if ((selectedStudent.payments || []).length > 0)
+          selectedStudent.payments.forEach((p) => payments.push(p));
+        const fullName = `${selectedStudent.student.user?.first_name || ''} ${selectedStudent.student.user?.last_name || ''}`.trim();
+        const body = generateFinancialReportBody(selectedStudent, payments);
+        return { subtitle: `${t("student_report_financial_subtitle_prefix")} ${fullName}`, body };
+      })
       setShowReportDropdown(false);
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la génération du rapport financier");
+      alert(t("error"));
     }
   };
 
@@ -383,12 +246,12 @@ const StudentManagement = () => {
       fetchStudentDetails(selectedStudent.student.id);
       setShowCourseModal(false);
     } catch (error) {
-      alert(error.response?.data?.error || "Erreur lors de l'ajout du cours");
+      alert(error.response?.data?.error || t("error"));
     }
   };
 
   const removeCourse = async (courseId) => {
-    if (!confirm("Êtes-vous sûr de vouloir retirer ce cours?")) return;
+    if (!confirm(t("confirm_remove_course"))) return;
 
     try {
       await api.delete(
@@ -411,7 +274,7 @@ const StudentManagement = () => {
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Modifier la note
+              {t("edit_grade")}
             </h2>
             <button
               onClick={onClose}
@@ -424,7 +287,7 @@ const StudentManagement = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Cours
+                {t("course")}
               </label>
               <p className="text-gray-900 dark:text-white font-medium">
                 {grade.course?.name}
@@ -433,7 +296,7 @@ const StudentManagement = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Note actuelle
+                {t("current_grade")}
               </label>
               <p className="text-2xl font-bold text-primary-600">
                 {grade.final_grade}/100 ({grade.letter_grade})
@@ -442,7 +305,7 @@ const StudentManagement = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nouvelle note
+                {t("new_grade")}
               </label>
               <input
                 type="number"
@@ -457,18 +320,18 @@ const StudentManagement = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Motif de modification *
+                {t("grade_change_reason")}
               </label>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Expliquez pourquoi cette note est modifiée..."
+                placeholder={t("grade_change_reason_placeholder")}
                 className="w-full p-3 rounded-lg bg-gray-100 dark:bg-dark-200 border-0 text-gray-900 dark:text-white"
                 rows={3}
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                Cette modification sera enregistrée dans les logs
+                {t("grade_change_reason_help")}
               </p>
             </div>
 
@@ -477,14 +340,14 @@ const StudentManagement = () => {
                 onClick={onClose}
                 className="flex-1 py-3 rounded-lg bg-gray-100 dark:bg-dark-200 text-gray-700 dark:text-gray-300 font-medium"
               >
-                Annuler
+                {t("cancel")}
               </button>
               <button
                 onClick={() => updateGrade(grade.id, newGrade, reason)}
                 disabled={!reason || reason.length < 10}
                 className="flex-1 py-3 rounded-lg bg-primary-500 text-white font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Enregistrer
+                {t("save")}
               </button>
             </div>
           </div>
