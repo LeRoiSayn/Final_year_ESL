@@ -65,4 +65,4 @@ USER www-data
 ENV PORT=8000
 EXPOSE 8000
 
-CMD ["/var/www/html/scripts/start.sh"]
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=\"${PORT}\""]
