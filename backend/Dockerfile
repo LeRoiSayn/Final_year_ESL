@@ -46,9 +46,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /var/www/html
 
+# Copy composer binary so dump-autoload can run with all source files present
+COPY --from=composer_deps /usr/bin/composer /usr/local/bin/composer
 COPY --from=composer_deps /app/vendor ./vendor
 COPY . .
 
+# Now composer exists — this actually runs and includes all project classes in the classmap
 RUN composer dump-autoload --optimize --classmap-authoritative --no-dev \
     && php artisan package:discover --ansi --no-interaction || true
 
@@ -56,8 +59,6 @@ RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framewor
 
 RUN chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
-
-RUN chmod +x scripts/start.sh
 
 USER www-data
 
